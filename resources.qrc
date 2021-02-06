@@ -1,0 +1,26 @@
+<RCC>
+    <qresource prefix="/">
+        <file>img/appicon.svg</file>
+        <file>img/ic_arrow_back_48px.svg</file>
+        <file>img/ic_arrow_forward_48px.svg</file>
+        <file>img/ic_cancel_48px.svg</file>
+        <file>img/ic_refresh_48px.svg</file>
+        <file>sql/createSettings.sql</file>
+        <file>img/ic_highlight_plus_48px.svg</file>
+        <file>img/clipboard.svg</file>
+        <file>img/jean_victor_balin_unknown_green.svg</file>
+        <file>img/kytka1.svg</file>
+        <file>img/app.svg</file>
+        <file>img/dev.svg</file>
+        <file>img/games.svg</file>
+        <file>img/gnustep.svg</file>
+        <file>img/media.svg</file>
+        <file>img/net.svg</file>
+        <file>img/page.svg</file>
+        <file>img/sci.svg</file>
+        <file>img/search.svg</file>
+        <file>img/sys.svg</file>
+        <file>img/www.svg</file>
+        <file>img/x11.svg</file>
+    </qresource>
+</RCC>
