@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   id="svg2"
+   viewBox="0 0 46.75 46.75"
+   sodipodi:version="0.32"
+   sodipodi:docname="jean_victor_balin_unknown_green.svg"
+   version="1.1"
+   width="46.75"
+   height="46.75"
+   inkscape:version="1.0.1 (3bc2e813f5, 2020-09-07)">
+  <defs
+     id="defs4">
+    <linearGradient
+       id="linearGradient1363"
+       y2="49.069"
+       gradientUnits="userSpaceOnUse"
+       x2="35.542"
+       gradientTransform="translate(-2.403,0.0047597)"
+       y1="19.176001"
+       x1="25.403999">
+      <stop
+         id="stop2844"
+         stop-color="#fff"
+         offset="0" />
+      <stop
+         id="stop2846"
+         stop-color="#c8c8c8"
+         offset="1" />
+    </linearGradient>
+    <linearGradient
+       id="linearGradient1364">
+      <stop
+         id="stop1366"
+         stop-color="#236b0d"
+         offset="0" />
+      <stop
+         id="stop1368"
+         stop-color="#0a2205"
+         offset="1" />
+    </linearGradient>
+    <radialGradient
+       id="radialGradient1343"
+       gradientUnits="userSpaceOnUse"
+       cy="16.362"
+       cx="24.764"
+       gradientTransform="matrix(0.025214,1.0261,-0.97814,0.024047,38.83,-3.5757)"
+       r="27.5">
+      <stop
+         id="stop2124"
+         stop-color="#2edc32"
+         offset="0" />
+      <stop
+         id="stop2126"
+         stop-color="#11661d"
+         offset="1" />
+    </radialGradient>
+    <linearGradient
+       id="linearGradient1346"
+       y2="63.66"
+       xlink:href="#linearGradient1364"
+       gradientUnits="userSpaceOnUse"
+       x2="63.487999"
+       y1="8.6307001"
+       x1="10.018" />
+    <radialGradient
+       id="radialGradient2812"
+       gradientUnits="userSpaceOnUse"
+       cy="14.047"
+       cx="18.386999"
+       gradientTransform="matrix(0.011424,1.0988,-1.844,0.018788,52.151,-5.6674)"
+       r="27.5">
+      <stop
+         id="stop2816"
+         stop-color="#e6e6e6"
+         offset="0" />
+      <stop
+         id="stop2818"
+         stop-color="#11661d"
+         stop-opacity="0"
+         offset="1" />
+    </radialGradient>
+    <linearGradient
+       id="linearGradient2832"
+       y2="63.66"
+       xlink:href="#linearGradient1364"
+       gradientUnits="userSpaceOnUse"
+       x2="63.487999"
+       gradientTransform="translate(-0.002841,-0.002841)"
+       y1="8.6307001"
+       x1="10.018" />
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     bordercolor="#666666"
+     pagecolor="#ffffff"
+     showgrid="false"
+     borderopacity="1.0"
+     showguides="false"
+     inkscape:document-rotation="0"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     inkscape:zoom="13.28125"
+     inkscape:cx="23.375"
+     inkscape:cy="23.375"
+     inkscape:window-width="1493"
+     inkscape:window-height="1047"
+     inkscape:window-x="179"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg2" />
+  <g
+     id="layer1"
+     transform="translate(-8.625,-8.625)">
+    <g
+       id="g1354">
+      <path
+         id="path1373"
+         fill="url(#linearGradient1346)"
+         d="m 32,8.6307 c -12.887,0 -23.369,10.482 -23.369,23.369 -3e-4,12.887 10.482,23.369 23.369,23.369 12.887,0 23.369,-10.482 23.369,-23.369 C 55.369,19.1127 44.887,8.6307 32,8.6307 Z"
+         style="fill:url(#linearGradient1346)" />
+      <path
+         id="path1339"
+         fill="url(#radialGradient1343)"
+         d="M 54.5,32 C 54.5,44.42 44.42,54.5 32,54.5 19.58,54.5 9.5,44.42 9.5,32 9.5,19.58 19.58,9.5 32,9.5 44.42,9.5 54.5,19.58 54.5,32 Z"
+         style="fill:url(#radialGradient1343)" />
+      <path
+         id="path1341"
+         fill="url(#radialGradient2812)"
+         d="m 32.017,9.1562 c -9.442,0 -17.512,5.7088 -20.955,13.813 4.944,2.833 10.331,4.887 16.119,4.625 5.574,-0.314 10.373,-4.063 16.056,-3.782 4.214,-0.096 9.007,1.482 11.252,5.188 C 53.143,17.8472 43.658,9.1562 32.017,9.1562 Z"
+         style="fill:url(#radialGradient2812)" />
+      <path
+         id="path2827"
+         fill="url(#linearGradient2832)"
+         d="M 32,8.625 C 19.113,8.625 8.625,19.113 8.625,32 8.625,44.887 19.113,55.375 32,55.375 44.887,55.375 55.375,44.887 55.375,32 55.375,19.113 44.887,8.625 32,8.625 Z M 32,9.5 C 44.42,9.5 54.5,19.58 54.5,32 54.5,44.42 44.42,54.5 32,54.5 19.58,54.5 9.5,44.42 9.5,32 9.5,19.58 19.58,9.5 32,9.5 Z"
+         style="fill:url(#linearGradient2832)" />
+      <path
+         id="text1353"
+         fill="url(#linearGradient1363)"
+         d="m 32.557,39.006 c 0.136,-3.17 0.543,-3.94 3.351,-6.114 3.488,-2.672 3.895,-2.989 4.212,-3.261 1.586,-1.359 2.491,-3.442 2.491,-5.616 0,-4.937 -3.985,-8.062 -10.326,-8.062 -5.978,0 -10.19,2.899 -10.19,7.066 0,2.445 1.811,4.212 4.302,4.212 2.31,0 3.895,-1.495 3.895,-3.624 0,-1.222 -0.498,-2.219 -1.449,-2.943 -0.815,-0.635 -0.86,-0.68 -0.86,-0.997 0,-0.634 0.996,-1.132 2.4,-1.132 2.717,0 4.257,1.812 4.257,4.982 0,1.857 -0.679,4.167 -1.811,6.205 -2.491,4.438 -2.854,5.344 -2.854,7.382 0,0.453 0.046,1.178 0.136,1.902 h 2.446 m -1.132,2.491 c -2.355,0 -4.258,1.903 -4.258,4.258 0,2.309 1.903,4.257 4.212,4.257 2.401,0 4.303,-1.902 4.303,-4.257 0,-2.355 -1.902,-4.258 -4.257,-4.258"
+         style="fill:url(#linearGradient1363)" />
+    </g>
+  </g>
+  <metadata
+     id="metadata25">
+    <rdf:RDF>
+      <cc:Work>
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <cc:license
+           rdf:resource="http://creativecommons.org/publicdomain/zero/1.0/" />
+        <dc:publisher>
+          <cc:Agent
+             rdf:about="http://openclipart.org/">
+            <dc:title>Openclipart</dc:title>
+          </cc:Agent>
+        </dc:publisher>
+        <dc:title>unknown_green</dc:title>
+        <dc:date>2006-10-27T02:12:13</dc:date>
+        <dc:description>clip art, clipart, help, help, icon, icon, image, media, png, public domain, question mark, question mark, svg, </dc:description>
+        <dc:source>http://openclipart.org/detail/974/unknown_green-by-jean_victor_balin</dc:source>
+        <dc:creator>
+          <cc:Agent>
+            <dc:title>jean_victor_balin</dc:title>
+          </cc:Agent>
+        </dc:creator>
+        <dc:subject>
+          <rdf:Bag>
+            <rdf:li>clip art</rdf:li>
+            <rdf:li>clipart</rdf:li>
+            <rdf:li>help</rdf:li>
+            <rdf:li>icon</rdf:li>
+            <rdf:li>image</rdf:li>
+            <rdf:li>media</rdf:li>
+            <rdf:li>png</rdf:li>
+            <rdf:li>public domain</rdf:li>
+            <rdf:li>question mark</rdf:li>
+            <rdf:li>svg</rdf:li>
+          </rdf:Bag>
+        </dc:subject>
+      </cc:Work>
+      <cc:License
+         rdf:about="http://creativecommons.org/publicdomain/zero/1.0/">
+        <cc:permits
+           rdf:resource="http://creativecommons.org/ns#Reproduction" />
+        <cc:permits
+           rdf:resource="http://creativecommons.org/ns#Distribution" />
+        <cc:permits
+           rdf:resource="http://creativecommons.org/ns#DerivativeWorks" />
+      </cc:License>
+    </rdf:RDF>
+  </metadata>
+</svg>

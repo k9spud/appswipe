@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<svg xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:svg="http://www.w3.org/2000/svg" id="svg2965" viewBox="0 0 166.37 168.47" version="1.1">
+  <defs id="defs2967">
+    <linearGradient id="linearGradient5057" y2="-148.13" gradientUnits="userSpaceOnUse" y1="-298.54" x2="387.75" x1="379.92">
+      <stop id="stop3954-9" stop-color="#0146a8" offset="0"/>
+      <stop id="stop3956-9" stop-color="#0146a8" stop-opacity="0" offset="1"/>
+    </linearGradient>
+    <linearGradient id="linearGradient4009" x1="381.89" gradientUnits="userSpaceOnUse" x2="387.75" gradientTransform="matrix(.93571 0 0 .97143 681.22 964.32)" y1="-310.05" y2="-147.97">
+      <stop id="stop3919-20" stop-color="#edf4fd" stop-opacity=".52846" offset="0"/>
+      <stop id="stop3921-8" stop-color="#175bb3" stop-opacity="0" offset="1"/>
+    </linearGradient>
+  </defs>
+  <g id="layer1" transform="translate(-399.4 -379.41)">
+    <g id="g5449" stroke-width="1.9" transform="matrix(.75853 0 0 .75853 -309.35 -113.17)">
+      <path id="path5051" transform="matrix(1 0 0 1.0126 656.29 971.52)" fill="#103683" d="m497.42-208.45c0 60.568-49.1 109.67-109.67 109.67-60.568 0-109.67-49.1-109.67-109.67 0-60.568 49.1-109.67 109.67-109.67 60.568 0 109.67 49.1 109.67 109.67z"/>
+      <path id="path5053" transform="matrix(.93571 0 0 .97143 681.22 964.32)" fill="url(#linearGradient5057)" d="m497.42-208.45c0 60.568-49.1 109.67-109.67 109.67-60.568 0-109.67-49.1-109.67-109.67 0-60.568 49.1-109.67 109.67-109.67 60.568 0 109.67 49.1 109.67 109.67z"/>
+      <g id="g5152" fill="#eee" transform="matrix(.94024 0 0 .94024 53.733 49.881)">
+        <path id="path5092" d="m1022.1 673.31c-5.4945 0-9.9163 4.144-9.9163 9.293v35.429c0 5.149 4.4218 9.293 9.9163 9.293h63.234c5.4945 0 9.9163-4.1441 9.9163-9.293v-35.429c0-5.149-4.4218-9.293-9.9163-9.293h-63.234zm9.1132 8.1443h45.008c5.4944 0 9.9163 4.1439 9.9163 9.293v19.141c0 5.1491-4.4219 9.2931-9.9163 9.2931h-45.008c-5.4945 0-9.9163-4.144-9.9163-9.2931v-19.141c0-5.1491 4.4218-9.293 9.9163-9.293z"/>
+        <rect id="rect5098" ry="14.021" rx="14.021" transform="translate(0 308.27)" height="37.666" width="48.744" y="470.46" x="970.45"/>
+        <rect id="rect5114" rx="14.021" ry="14.021" height="37.666" width="48.744" y="779.84" x="1091.2"/>
+        <rect id="rect5116" rx="14.021" ry="14.021" height="37.666" width="48.744" y="779.84" x="1030.3"/>
+        <g id="g5138">
+          <rect id="rect5126" y="736.36" width="9.1395" x="1049.7" height="37.389"/>
+          <rect id="rect5128" y="748.54" width="9.4164" x="1110.8" height="25.203"/>
+          <rect id="rect5134" y="748.54" width="9.4164" x="981.92" height="25.203"/>
+          <rect id="rect5136" y="748.54" width="138.26" x="981.92" height="10.771"/>
+        </g>
+        <rect id="rect5144" transform="translate(0 308.27)" height="5.2876" width="49.546" y="379.64" x="1029.7"/>
+        <rect id="rect5146" transform="translate(0 308.27)" height="5.2876" width="49.546" y="379.64" x="1029.7"/>
+        <rect id="rect5148" y="697.91" width="49.546" x="1029.7" height="5.2876"/>
+        <rect id="rect5150" y="707.91" width="49.546" x="1029.7" height="5.2876"/>
+      </g>
+      <path id="path5055" fill="url(#linearGradient4009)" d="m1044 655.28c-56.674 0-102.63 47.725-102.63 106.56 0 3.7524 0.1979 7.4415 0.5625 11.094 50.067 18.726 126.58 32.369 204.69-10.594 0.0007-0.16695 0-0.33287 0-0.5 0-58.837-45.951-106.56-102.62-106.56z"/>
+    </g>
+  </g>
+  <metadata>
+    <rdf:RDF>
+      <cc:Work>
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+        <cc:license rdf:resource="http://creativecommons.org/licenses/publicdomain/"/>
+        <dc:publisher>
+          <cc:Agent rdf:about="http://openclipart.org/">
+            <dc:title>Openclipart</dc:title>
+          </cc:Agent>
+        </dc:publisher>
+        <dc:title>network-blue</dc:title>
+        <dc:date>2010-08-04T13:04:34</dc:date>
+        <dc:description>Single web 2.0  icons from my set. check the whole set in my clip art if you want get all of it together.</dc:description>
+        <dc:source>http://openclipart.org/detail/77371/network-blue-by-shokunin</dc:source>
+        <dc:creator>
+          <cc:Agent>
+            <dc:title>shokunin</dc:title>
+          </cc:Agent>
+        </dc:creator>
+        <dc:subject>
+          <rdf:Bag>
+            <rdf:li>arrow</rdf:li>
+            <rdf:li>chat</rdf:li>
+            <rdf:li>clip art</rdf:li>
+            <rdf:li>clipart</rdf:li>
+            <rdf:li>communicator</rdf:li>
+            <rdf:li>computer</rdf:li>
+            <rdf:li>desktop</rdf:li>
+            <rdf:li>earth</rdf:li>
+            <rdf:li>email.mail</rdf:li>
+            <rdf:li>globe</rdf:li>
+            <rdf:li>icon</rdf:li>
+            <rdf:li>icons</rdf:li>
+            <rdf:li>information</rdf:li>
+            <rdf:li>interface</rdf:li>
+            <rdf:li>lock</rdf:li>
+            <rdf:li>messenger</rdf:li>
+            <rdf:li>mobile</rdf:li>
+            <rdf:li>network</rdf:li>
+            <rdf:li>pc</rdf:li>
+            <rdf:li>phone</rdf:li>
+            <rdf:li>secure</rdf:li>
+            <rdf:li>set</rdf:li>
+            <rdf:li>shopping cart</rdf:li>
+            <rdf:li>unlock</rdf:li>
+            <rdf:li>web 2.0</rdf:li>
+            <rdf:li>website</rdf:li>
+          </rdf:Bag>
+        </dc:subject>
+      </cc:Work>
+      <cc:License rdf:about="http://creativecommons.org/licenses/publicdomain/">
+        <cc:permits rdf:resource="http://creativecommons.org/ns#Reproduction"/>
+        <cc:permits rdf:resource="http://creativecommons.org/ns#Distribution"/>
+        <cc:permits rdf:resource="http://creativecommons.org/ns#DerivativeWorks"/>
+      </cc:License>
+    </rdf:RDF>
+  </metadata>
+</svg>
