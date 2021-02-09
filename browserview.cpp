@@ -53,13 +53,11 @@ BrowserView::BrowserView(QWidget *parent) : QTextEdit(parent)
 {
     status = new QLabel(this);
     status->setStyleSheet(R"EOF(
-padding-top: 6px;
-padding-bottom: 4px;
-padding-left: 5px;
-padding-right: 5px;
-background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                stop: 0 rgba(21, 21, 13, 0), stop: 0.25 rgba(21, 21, 13, 255),
-                                stop: 1.0 rgba(21, 21, 13, 255));
+padding-left: 1px;
+padding-right: 1px;
+background-color: rgb(57, 57, 57);
+border-top-right-radius: 8px;
+border-top-left-radius: 8px;
 )EOF");
     status->setVisible(false);
 
@@ -77,7 +75,8 @@ background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
     delayLoading = false;
     currentHistory = -1;
     setReadOnly(true);
-
+    setTabChangesFocus(false);
+    setTextInteractionFlags(Qt::TextBrowserInteraction);
     iconMap["app"] = ":/img/app.svg";
     iconMap["dev"] = ":/img/dev.svg";
     iconMap["games"] = ":/img/games.svg";
@@ -208,10 +207,12 @@ void BrowserView::setIcon(QString fileName)
 
     if(icon.isNull())
     {
-        qDebug() << "Icon is null:" << fileName;
+        siteIcon = QIcon(":/img/page.svg");
     }
-
-    siteIcon = icon;
+    else
+    {
+        siteIcon = icon;
+    }
     emit iconChanged(siteIcon);
 }
 
@@ -267,11 +268,11 @@ void BrowserView::setStatus(QString text)
 
         QFontMetrics fm(font);
         QRect rect = fm.boundingRect(text);
-        int maxWidth = width();
+        int maxWidth = width() - verticalScrollBar()->width();
         int lineHeight = rect.height();
         if(rect.width() > maxWidth)
         {
-            rect.setHeight(lineHeight * 4);
+            rect.setHeight(lineHeight * (rect.width() / maxWidth + 1));
             rect.setWidth(maxWidth);
             rect = fm.boundingRect(rect, Qt::TextWordWrap, text);
             status->setWordWrap(true);
@@ -280,9 +281,9 @@ void BrowserView::setStatus(QString text)
         {
             status->setWordWrap(false);
         }
-        int pad = 10;
-        int y = height() - (rect.height() + pad);
-        status->setGeometry(0, y, rect.width() + (pad * 2), rect.height() + pad);
+        int pad = 14;
+        int y = height() - rect.height();
+        status->setGeometry(0, y, rect.width() + pad, rect.height());
         status->setVisible(true);
     }
 }
@@ -298,6 +299,7 @@ void BrowserView::navigateTo(QString text, bool changeHistory, bool feelingLucky
         if(changeHistory && !text.startsWith("install:") && !text.startsWith("uninstall:") && !text.startsWith("unmask:"))
         {
             appendHistory(text);
+            emit urlChanged(text);
         }
 
         if(text.contains(':'))
@@ -315,7 +317,6 @@ void BrowserView::navigateTo(QString text, bool changeHistory, bool feelingLucky
             setScrollPosition(delayScrollX, delayScrollY);
         }
 
-        emit urlChanged(text);
         setFocus();
     }
 }
@@ -375,28 +376,7 @@ void BrowserView::setUrl(const QUrl& url)
     }
     else if(scheme == "file")
     {
-        QFile input(url.toLocalFile());
-        if(!input.exists())
-        {
-            error("File '" + input.fileName() + "' does not exist.");
-            return;
-        }
-
-        if(!input.open(QIODevice::ReadOnly))
-        {
-            error("File '" + input.fileName() + "' could not be opened.");
-            return;
-        }
-
-        setIcon(":/img/page.svg");
-        QByteArray data = input.readAll();
-        QString oldTitle = documentTitle();
-        setText(data);
-
-        if(documentTitle() != oldTitle)
-        {
-            emit titleChanged(documentTitle());
-        }
+        viewFile(url.toLocalFile());
     }
 }
 
@@ -434,7 +414,7 @@ void BrowserView::forward()
     }
 }
 
-void BrowserView::reload()
+void BrowserView::reload(bool hardReload)
 {
     clear();
     qApp->processEvents();
@@ -442,13 +422,16 @@ void BrowserView::reload()
     if(history.count())
     {
         QString text = history.at(currentHistory);
-        if(text.startsWith("app:"))
+        if(hardReload && text.startsWith("app:"))
         {
-            //qDebug() << "Reloading:" << text;
             reloadApp(text);
         }
 
         navigateTo(text, false);
+    }
+    else
+    {
+        about();
     }
 }
 
@@ -882,17 +865,7 @@ values
                 fi.setFile(buildsPath + "/" + ebuildFilePath);
                 published = fi.birthTime().toSecsSinceEpoch();
 
-                input.setFileName(buildsPath + "/" + ebuildFilePath);
-                if(!input.open(QIODevice::ReadOnly))
-                {
-                    qDebug() << "Can't open ebuild:" << input.fileName();
-                }
-                else
-                {
-                    data = input.readAll();
-                    input.close();
-                    portage->ebuildParser(data);
-                }
+                portage->ebuildReader(buildsPath + "/" + ebuildFilePath);
 
                 query.bindValue(0, category);
                 query.bindValue(1, repoId);
@@ -1021,17 +994,7 @@ values
             published = 0;
             obsolete = true;
 
-            input.setFileName(ebuildFilePath);
-            if(!input.open(QIODevice::ReadOnly))
-            {
-                qDebug() << "Can't open ebuild:" << input.fileName();
-            }
-            else
-            {
-                data = input.readAll();
-                input.close();
-                portage->ebuildParser(data);
-            }
+            portage->ebuildReader(ebuildFilePath);
 
             query.bindValue(0, category);
             if(repoId == -1)
@@ -1600,15 +1563,52 @@ void BrowserView::reloadingDatabase()
     QString text = QString(R"EOF(
 <HTML>
 <HEAD>
-<TITLE>Reloading Database</TITLE>
+<TITLE>Loading</TITLE>
 <HEAD>
 <BODY>
-<P ALIGN=CENTER><CENTER><IMG SRC=":/img/appicon.svg"></CENTER></P>
+<P ALIGN=CENTER><IMG SRC=":/img/appicon.svg"></P>
 </BODY>
 </HTML>
 )EOF");
     QString oldTitle = documentTitle();
     setText(text);
+
+    if(documentTitle() != oldTitle)
+    {
+        emit titleChanged(documentTitle());
+    }
+}
+
+void BrowserView::viewFile(QString fileName)
+{
+    QFile input(fileName);
+    if(!input.exists())
+    {
+        error("File '" + fileName + "' does not exist.");
+        return;
+    }
+
+    if(!input.open(QIODevice::ReadOnly))
+    {
+        error("File '" + fileName + "' could not be opened.");
+        return;
+    }
+
+    setIcon(":/img/page.svg");
+    QByteArray data = input.readAll();
+    QString oldTitle = documentTitle();
+    if(fileName.endsWith(".md"))
+    {
+        setMarkdown(data);
+    }
+    else if(fileName.endsWith(".html") || fileName.endsWith(".htm"))
+    {
+        setHtml(data);
+    }
+    else
+    {
+        setText(data);
+    }
 
     if(documentTitle() != oldTitle)
     {

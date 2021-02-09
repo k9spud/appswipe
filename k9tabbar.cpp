@@ -36,8 +36,14 @@ K9TabBar::K9TabBar(QWidget* parent) : QTabBar(parent)
     label = new QLabel(parent);
     label->setVisible(false);
     label->setWordWrap(true);
-    installEventFilter(this);
+    label->setStyleSheet(R"EOF(
+background-color: rgba(57, 57, 57, 255);
+border-top-right-radius: 10px;
+border-bottom-right-radius: 10px;
+padding-left: 1px;
+)EOF");
 
+    installEventFilter(this);
     setObjectName("K9TabBar");
 }
 
@@ -46,7 +52,8 @@ K9TabBar::~K9TabBar()
     delete label;
 }
 
-// Disables Tool Tips from popping up, since we do our own title pop ups in mouseMoveEvent/enterEvent/leaveEvent
+// Disable Tool Tips from popping up, since we do our own title pop up boxes
+// in mouseMoveEvent/enterEvent/leaveEvent
 bool K9TabBar::eventFilter(QObject* object, QEvent* event)
 {
     Q_UNUSED(object);
@@ -146,38 +153,22 @@ void K9TabBar::mouseReleaseEvent(QMouseEvent* event)
 
 void K9TabBar::showTabLabel(int tab)
 {
-    if(tab < 0)
+    QString text;
+    if(tab < 0 || tab == currentIndex() || (text = tabToolTip(tab)).isEmpty())
     {
         label->setVisible(false);
         labeledTab = -1;
         return;
     }
 
-    QString text = tabToolTip(tab);
-    if(text.isEmpty())
-    {
-        label->setVisible(false);
-        labeledTab = -1;
-        return;
-    }
-
-    QRect r = tabRect(tab);
     label->setText(text);
-    if(currentIndex() == tab)
-    {
-        label->setStyleSheet("background-color: #151510;");
-    }
-    else
-    {
-        label->setStyleSheet("background-color: rgb(57, 57, 57);");
-    }
-
+    QRect r = tabRect(tab);
     QFont font = label->font();
     QFontMetrics fm(font);
     QRect max(0, 0, parentWidget()->width() - r.width(), r.height());
     QRect rect = fm.boundingRect(max, Qt::TextWordWrap, label->text());
 
-    label->setGeometry(width(), r.y(), rect.width() + 8, r.height());
+    label->setGeometry(width(), r.y(), rect.width() + 15, r.height());
     label->setVisible(true);
     labeledTab = tab;
 }

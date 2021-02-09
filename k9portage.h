@@ -44,7 +44,7 @@ public:
     QHash<QString, QString> vars;
     QVariant var(QString key);
 
-    void ebuildParser(QString data);
+    void ebuildReader(QString fileName);
     void parseVerCut(QString& value);
     QRegularExpression verCutSingle;
     QRegularExpression verCutRange;

@@ -42,6 +42,7 @@ public slots:
     BrowserView* createBackgroundTab();
     void openInNewTab(const QString& url);
     void closeTab(int index);
+    void closeAll();
 
 signals:
     void urlChanged(const QUrl& url);

@@ -18,6 +18,8 @@
 
 #include <QDir>
 #include <QDebug>
+#include <QFile>
+#include <QTextStream>
 
 K9Portage::K9Portage(QObject *parent) : QObject(parent)
 {
@@ -92,7 +94,7 @@ void K9Portage::parseVerCut(QString& value)
 {
     bool matchFound;
     QRegularExpressionMatch match;
-
+    int i, j;
     do
     {
         matchFound = false;
@@ -100,42 +102,51 @@ void K9Portage::parseVerCut(QString& value)
         if(match.hasMatch())
         {
             matchFound = true;
-            int c1 = match.captured(2).toInt();
-            int c2 = match.captured(3).toInt();
-            value = value.replace(match.capturedStart(), match.capturedLength(), QString("%1.%2").arg(version.cut(c1 - 1)).arg(version.cut(c2 - 1)));
+            i = match.captured(2).toInt() - 1;
+            j = match.captured(3).toInt() - 1;
+            value.replace(match.capturedStart(), match.capturedLength(), QString("%1.%2").arg(version.cut(i)).arg(version.cut(j)));
         }
 
         match = verCutSingle.match(value);
         if(match.hasMatch())
         {
             matchFound = true;
-            int c = match.captured(2).toInt();
-            value = value.replace(match.capturedStart(), match.capturedLength(), QString("%1").arg(version.cut(c - 1)));
+            i = match.captured(2).toInt() - 1;
+            value.replace(match.capturedStart(), match.capturedLength(), version.cut(i));
         }
     } while(matchFound);
 }
 
-void K9Portage::ebuildParser(QString data)
+void K9Portage::ebuildReader(QString fileName)
 {
+    QFile input(fileName);
+    if(!input.exists())
+    {
+        qDebug() << "eBuild" << input.fileName() << "does not exist.";
+        return;
+    }
+
+    if(!input.open(QIODevice::ReadOnly))
+    {
+        qDebug() << "eBuild" << input.fileName() << "could not be opened for reading.";
+        return;
+    }
+
+    QString s;
     QString key;
     QString value;
     QRegularExpressionMatch match;
-    QRegularExpressionMatch vrmatch;
-
-    QStringList ebuildStatements = data.split('\n');
-    foreach(data, ebuildStatements)
+    QTextStream in(&input);
+    while(in.atEnd() == false)
     {
-        data.remove('\n');
-        data = data.trimmed();
-        if(data.isEmpty() || data.startsWith('#'))
+        s = in.readLine();
+        s = s.trimmed();
+        if(s.isEmpty() || s.startsWith('#'))
         {
             continue;
         }
 
-        key.clear();
-        value.clear();
-
-        match = stringAssignment.match(data, 0, QRegularExpression::NormalMatch, QRegularExpression::NoMatchOption);
+        match = stringAssignment.match(s, 0, QRegularExpression::NormalMatch, QRegularExpression::NoMatchOption);
         if(match.hasMatch() && match.lastCapturedIndex() >= 2)
         {
             key = match.captured(1).toUpper();
@@ -143,7 +154,7 @@ void K9Portage::ebuildParser(QString data)
         }
         else
         {
-            match = variableAssignment.match(data, 0, QRegularExpression::NormalMatch, QRegularExpression::NoMatchOption);
+            match = variableAssignment.match(s, 0, QRegularExpression::NormalMatch, QRegularExpression::NoMatchOption);
             if(match.hasMatch() && match.lastCapturedIndex() >= 2)
             {
                 key = match.captured(1).toUpper();
@@ -155,24 +166,23 @@ void K9Portage::ebuildParser(QString data)
         {
             parseVerCut(value);
 
-            int index = 0;
-            vrmatch = var_ref.match(value, index, QRegularExpression::PartialPreferFirstMatch, QRegularExpression::NoMatchOption);
-            while(vrmatch.hasMatch())
+            match = var_ref.match(value, 0, QRegularExpression::PartialPreferFirstMatch, QRegularExpression::NoMatchOption);
+            while(match.hasMatch())
             {
-                QString replace = vrmatch.captured(0);
-                QString var = vrmatch.captured(1);
-                if(vars.contains(var))
+                s = match.captured(1).toUpper();
+                if(vars.contains(s))
                 {
-                    value = value.replace(replace, vars[var]);
+                    value.replace(match.capturedStart(), match.capturedLength(), vars[s]);
                 }
                 else
                 {
-                    value = value.remove(replace);
+                    value.remove(match.capturedStart(), match.capturedLength());
                 }
-                vrmatch = var_ref.match(value, index, QRegularExpression::NormalMatch, QRegularExpression::NoMatchOption);
+                match = var_ref.match(value, 0, QRegularExpression::NormalMatch, QRegularExpression::NoMatchOption);
             }
 
             vars[key] = value;
+            key.clear();
         }
     }
 }

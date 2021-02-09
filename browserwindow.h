@@ -50,6 +50,7 @@ public:
 public slots:
     void updateAskButton();
     void updateClipButton();
+    void focusLineEdit();
     void exec(QString cmd);
     void install(QString atom);
     void uninstall(QString atom);

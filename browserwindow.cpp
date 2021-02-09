@@ -432,6 +432,11 @@ void BrowserWindow::updateClipButton()
     ui->clipButton->setIcon(QIcon(pix));
 }
 
+void BrowserWindow::focusLineEdit()
+{
+    ui->lineEdit->setFocus();
+}
+
 void BrowserWindow::exec(QString cmd)
 {
     if(clip)
@@ -520,7 +525,7 @@ void BrowserWindow::reloadDatabase()
     connect(rescan, SIGNAL(finished()), this, SLOT(reloadDatabaseComplete()));
 
     currentView()->reloadingDatabase();
-    currentView()->setStatus("Reloading package database...");
+    currentView()->setStatus("Loading package database...");
     rescan->rescan();
 }
 
@@ -529,7 +534,8 @@ void BrowserWindow::reloadDatabaseComplete()
     disconnect(rescan, SIGNAL(progress(int)), ui->searchProgress, SLOT(setValue(int)));
     disconnect(rescan, SIGNAL(finished()), this, SLOT(reloadDatabaseComplete()));
     workFinished();
-    currentView()->about();
+
+    currentView()->reload(false);
     ui->lineEdit->setFocus();
 }
 
@@ -537,16 +543,16 @@ void BrowserWindow::closeEvent(QCloseEvent* event)
 {
     if(browser->windows.count() == 1)
     {
-        // if this is the last window remaining open, don't close the window.
+        // if this is the last window remaining open, don't delete the window.
         // instead, we quit the application, which will save this window's tabs before
         // closing down the app.
         setVisible(false);
         event->ignore();
-        qApp->processEvents();
         qApp->quit();
         return;
     }
 
     event->accept();
+    ui->tabWidget->closeAll();
     deleteLater();
 }

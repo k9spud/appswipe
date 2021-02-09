@@ -76,11 +76,12 @@ public slots:
     void error(QString text);
     void back();
     void forward();
-    void reload();
+    void reload(bool hardReload = true);
     void stop();
 
     void about();
     void reloadingDatabase();
+    void viewFile(QString fileName);
     void viewApp(const QUrl& url);
     void reloadApp(const QUrl& url);
     void searchApps(QString search, bool feelingLucky = false);

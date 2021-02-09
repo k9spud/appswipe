@@ -97,6 +97,7 @@ void RescanThread::run()
     }
 
     QStringList categories;
+    int folderCount = 0, progressCount = 0;
     QDir dir;
     foreach(QString repo, portage->repos)
     {
@@ -104,6 +105,7 @@ void RescanThread::run()
         dir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
         foreach(QString cat, dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot))
         {
+            folderCount++;
             if(categories.contains(cat) == false)
             {
                 categories.append(cat);
@@ -115,6 +117,7 @@ void RescanThread::run()
     dir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
     foreach(QString cat, dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot))
     {
+        folderCount++;
         if(categories.contains(cat) == false)
         {
             categories.append(cat);
@@ -132,7 +135,6 @@ void RescanThread::run()
     {
         query.bindValue(0, i);
         query.bindValue(1, categories.at(i));
-
         if(query.exec() == false)
         {
             db.rollback();
@@ -160,8 +162,6 @@ void RescanThread::run()
     QFileInfo fi;
     bool ok;
 
-    int total = portage->repos.count() * categories.count();
-
     QString sql = QString(R"EOF(
 insert into PACKAGE
 (
@@ -178,12 +178,21 @@ values
     for(int repoId = 0; repoId < portage->repos.count(); repoId++)
     {
         qDebug() << "Scanning repo:" << portage->repos.at(repoId);
-
         for(int categoryId = 0; categoryId < categories.count(); categoryId++)
         {
+            if(abort)
+            {
+                break;
+            }
+
             categoryPath = portage->repos.at(repoId);
             categoryPath.append(categories.at(categoryId));
             dir.setPath(categoryPath);
+            if(dir.exists() == false)
+            {
+                continue;
+            }
+
             foreach(packageName, dir.entryList(QDir::AllDirs | QDir::NoDotAndDotDot))
             {
                 buildsPath = categoryPath;
@@ -221,17 +230,7 @@ values
                     fi.setFile(buildsPath + "/" + ebuildFilePath);
                     published = fi.birthTime().toSecsSinceEpoch();
 
-                    input.setFileName(buildsPath + "/" + ebuildFilePath);
-                    if(!input.open(QIODevice::ReadOnly))
-                    {
-                        qDebug() << "Can't open ebuild:" << input.fileName();
-                    }
-                    else
-                    {
-                        data = input.readAll();
-                        input.close();
-                        portage->ebuildParser(data);
-                    }
+                    portage->ebuildReader(buildsPath + "/" + ebuildFilePath);
 
                     query.bindValue(0, categoryId);
                     query.bindValue(1, repoId);
@@ -261,11 +260,7 @@ values
                 }
             }
 
-            emit progress(100 * static_cast<float>(repoId * categories.count() + categoryId) / static_cast<float>(total));
-            if(abort)
-            {
-                break;
-            }
+            emit progress(100.0f * static_cast<float>(progressCount++) / static_cast<float>(folderCount));
         }
     }
 
@@ -293,8 +288,18 @@ values
     qDebug() << "Scanning installed packages...";
     for(int categoryId = 0; categoryId < categories.count(); categoryId++)
     {
+        if(abort)
+        {
+            break;
+        }
+
         categoryPath = QString("/var/db/pkg/%1/").arg(categories.at(categoryId));
         dir.setPath(categoryPath);
+        if(dir.exists() == false)
+        {
+            continue;
+        }
+
         foreach(package, dir.entryList(QDir::AllDirs | QDir::NoDotAndDotDot))
         {
             portage->vars.clear();
@@ -363,17 +368,7 @@ values
                 published = 0;
                 obsolete = true;
 
-                input.setFileName(ebuildFilePath);
-                if(!input.open(QIODevice::ReadOnly))
-                {
-                    qDebug() << "Can't open ebuild:" << input.fileName();
-                }
-                else
-                {
-                    data = input.readAll();
-                    input.close();
-                    portage->ebuildParser(data);
-                }
+                portage->ebuildReader(ebuildFilePath);
 
                 query.bindValue(0, categoryId);
                 if(repoId == -1)
@@ -411,11 +406,7 @@ values
             }
         }
 
-        emit progress(100 * static_cast<float>(repoId * categories.count() + categoryId) / static_cast<float>(total));
-        if(abort)
-        {
-            break;
-        }
+        emit progress(100.0f * static_cast<float>(progressCount++) / static_cast<float>(folderCount));
     }
     db.commit();
 /*

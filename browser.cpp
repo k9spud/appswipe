@@ -74,13 +74,19 @@ Browser::Browser(QObject *parent) : QObject(parent)
                     if(qry.value(2).toInt() != 0) // is current page?
                     {
                         currentPage = page;
-                        view->delayScroll(scrollX, scrollY);
-                        view->navigateTo(url);
-                        view->setFocus();
+                        if(url.isEmpty() == false || title.isEmpty() == false)
+                        {
+                            view->delayScroll(scrollX, scrollY);
+                            view->navigateTo(url);
+                            view->setFocus();
+                        }
                     }
                     else
                     {
-                        view->delayLoad(url, title, scrollX, scrollY);
+                        if(url.isEmpty() == false || title.isEmpty() == false)
+                        {
+                            view->delayLoad(url, title, scrollX, scrollY);
+                        }
                         window->tabWidget()->setTabToolTip(page, title);
                     }
 
@@ -118,10 +124,6 @@ void Browser::closeAll()
 {
     foreach(BrowserWindow* window, windows)
     {
-        while(window->tabWidget()->count() > 1)
-        {
-            window->tabWidget()->closeTab(0);
-        }
         window->close();
         qApp->processEvents();
     }

@@ -40,8 +40,11 @@ TabWidget::TabWidget(QWidget *parent) : QTabWidget(parent)
     connect(tabbar, &QTabBar::tabCloseRequested, this, &TabWidget::closeTab);
     connect(tabbar, &QTabBar::tabBarDoubleClicked, [this](int index)
     {
-        if (index == -1)
+        if(index == -1)
+        {
             createTab();
+            window->focusLineEdit();
+        }
     });
     connect(this, &QTabWidget::currentChanged, this, &TabWidget::currentTabChanged);
 }
@@ -59,14 +62,16 @@ BrowserView* TabWidget::currentView()
 
 BrowserView* TabWidget::tabView(int index)
 {
-    BrowserView* view = qobject_cast<BrowserView*>(widget(index));
-
-    if(view == nullptr)
+    if(index >= 0 && index < count())
     {
-        return createTab();
+        BrowserView* view = qobject_cast<BrowserView*>(widget(index));
+        if(view != nullptr)
+        {
+            return view;
+        }
     }
 
-    return view;
+    return createTab();
 }
 
 void TabWidget::setTabIcon(int index, const QIcon& icon)
@@ -197,6 +202,16 @@ void TabWidget::closeTab(int index)
     }
 }
 
+void TabWidget::closeAll()
+{
+    disconnect(this, &QTabWidget::currentChanged, this, &TabWidget::currentTabChanged);
+    for(int i = 0; i < count(); i++)
+    {
+        widget(i)->deleteLater();
+    }
+    clear();
+}
+
 void TabWidget::currentTabChanged(int index)
 {
     tabbar->showTabLabel(-1);
@@ -223,6 +238,11 @@ void TabWidget::currentTabChanged(int index)
     {
         view->setFocus();
     }
+    else
+    {
+        window->focusLineEdit();
+    }
+
     emit titleChanged(view->documentTitle());
     emit urlChanged(view->url());
 }
