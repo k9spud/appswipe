@@ -7,8 +7,8 @@ Making it easy to manage your system from a point and click user interface
 rather than having to type out long command lines for installing, 
 uninstalling, and upgrading apps.
 
-The program was written with Qt 5.15.2, Sqlite 3.34.0, Portage 3.0.14, and 
-Portage Utils 0.90.1. 
+The program was written with Qt 5.15.2, Sqlite 3.34.0, Portage 3.0.14, 
+Portage Utils 0.90.1, exo 4.16.0, and Xfce4 Terminal 0.8.10.
 
 License
 =======
