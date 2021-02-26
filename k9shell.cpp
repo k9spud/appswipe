@@ -24,7 +24,6 @@ class K9Shell* shell = nullptr;
 
 K9Shell::K9Shell(QObject *parent) : QProcess(parent)
 {
-    tmp = nullptr;
 }
 
 void K9Shell::externalBrowser(QString url)
@@ -37,21 +36,26 @@ void K9Shell::externalBrowser(QString url)
 
 void K9Shell::externalTerm(QString cmd)
 {
-    if(tmp != nullptr)
-    {
-        delete tmp;
-    }
-    tmp = new QTemporaryFile();
+    QTemporaryFile* tmp = new QTemporaryFile();
     if(tmp->open() == false)
     {
         qDebug() << "Couldn't open temporary file.";
+        delete tmp;
         return;
     }
 
     QTextStream out(tmp);
-    out << "echo \"" << cmd << "\"\n";
+    QString escaped = cmd;
+    if(escaped.contains("\""))
+    {
+        escaped.replace("\"", "\\\"");
+    }
+    out << "echo \"" << escaped << "\"\n";
     out << cmd << "\n";
-    out << "read -rsn1 -p\"Press any key to close (exit code: $?)\n\";echo\n";
+    if(cmd.endsWith("| less") == false)
+    {
+        out << "read -rsn1 -p\"Press any key to close (exit code: $?)\n\";echo\n";
+    }
     out.flush();
     tmp->close();
 

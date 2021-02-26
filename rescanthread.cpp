@@ -153,6 +153,7 @@ void RescanThread::run()
     QString ebuildFilePath;
     QString data;
     QString installedFilePath;
+    QString repoFilePath;
     QString packageName;
     int downloadSize = -1;
     qint64 published = 0;
@@ -212,17 +213,29 @@ values
                     fi.setFile(installedFilePath);
                     if(fi.exists())
                     {
-                        installed = fi.birthTime().toSecsSinceEpoch();
-                        input.setFileName(QString("%1/SIZE").arg(installedFilePath));
+                        repoFilePath = QString("%1/repository").arg(installedFilePath);
+                        input.setFileName(repoFilePath);
                         if(input.open(QIODevice::ReadOnly))
                         {
                             data = input.readAll();
                             input.close();
                             data = data.trimmed();
-                            downloadSize = data.toInt(&ok);
-                            if(ok == false)
+                            repo = QString("/var/db/repos/%1/").arg(data);
+                            if(repo == portage->repos.at(repoId))
                             {
-                                downloadSize = -1;
+                                installed = fi.birthTime().toSecsSinceEpoch();
+                                input.setFileName(QString("%1/SIZE").arg(installedFilePath));
+                                if(input.open(QIODevice::ReadOnly))
+                                {
+                                    data = input.readAll();
+                                    input.close();
+                                    data = data.trimmed();
+                                    downloadSize = data.toInt(&ok);
+                                    if(ok == false)
+                                    {
+                                        downloadSize = -1;
+                                    }
+                                }
                             }
                         }
                     }
@@ -238,12 +251,12 @@ values
                     query.bindValue(3, portage->var("DESCRIPTION"));
                     query.bindValue(4, portage->var("HOMEPAGE"));
                     query.bindValue(5, portage->version.pvr);
-                    query.bindValue(6, portage->version.cut(0));
-                    query.bindValue(7, portage->version.cut(1));
-                    query.bindValue(8, portage->version.cut(2));
-                    query.bindValue(9, portage->version.cut(3));
-                    query.bindValue(10, portage->version.cut(4));
-                    query.bindValue(11, portage->var("PR"));
+                    query.bindValue(6, portage->version.cutNoRevision(0));
+                    query.bindValue(7, portage->version.cutNoRevision(1));
+                    query.bindValue(8, portage->version.cutNoRevision(2));
+                    query.bindValue(9, portage->version.cutNoRevision(3));
+                    query.bindValue(10, portage->version.cutNoRevision(4));
+                    query.bindValue(11, portage->version.revision());
                     query.bindValue(12, portage->var("SLOT"));
                     query.bindValue(13, portage->var("LICENSE"));
                     query.bindValue(14, installed);
@@ -264,7 +277,6 @@ values
         }
     }
 
-    QString repoFilePath;
     bool obsolete;
     int repoId = 0;
     query.prepare(R"EOF(
@@ -383,12 +395,12 @@ values
                 query.bindValue(3, portage->var("DESCRIPTION"));
                 query.bindValue(4, portage->var("HOMEPAGE"));
                 query.bindValue(5, portage->version.pvr);
-                query.bindValue(6, portage->version.cut(0));
-                query.bindValue(7, portage->version.cut(1));
-                query.bindValue(8, portage->version.cut(2));
-                query.bindValue(9, portage->version.cut(3));
-                query.bindValue(10, portage->version.cut(4));
-                query.bindValue(11, portage->version.pr());
+                query.bindValue(6, portage->version.cutNoRevision(0));
+                query.bindValue(7, portage->version.cutNoRevision(1));
+                query.bindValue(8, portage->version.cutNoRevision(2));
+                query.bindValue(9, portage->version.cutNoRevision(3));
+                query.bindValue(10, portage->version.cutNoRevision(4));
+                query.bindValue(11, portage->version.revision());
                 query.bindValue(12, portage->var("SLOT"));
                 query.bindValue(13, portage->var("LICENSE"));
                 query.bindValue(14, installed);
@@ -409,27 +421,7 @@ values
         emit progress(100.0f * static_cast<float>(progressCount++) / static_cast<float>(folderCount));
     }
     db.commit();
-/*
-    db.transaction();
-    if(query.exec("update PACKAGE set MASKED=1 where VERSION like '%9999%'") == false)
-    {
-        db.rollback();
-        return;
-    }
-
-    if(query.exec("update PACKAGE set MASKED=1 where VERSION like '%_alpha%'") == false)
-    {
-        db.rollback();
-        return;
-    }
-
-    if(query.exec("update PACKAGE set MASKED=1 where VERSION like '%_beta%'") == false)
-    {
-        db.rollback();
-        return;
-    }
-    db.commit();
-*/
+    portage->applyMasks(db);
     emit progress(100);
     qDebug() << "Rescan thread finished.";
 }

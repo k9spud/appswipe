@@ -25,6 +25,7 @@
 #include <QHash>
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
+#include <QSqlDatabase>
 
 class K9Portage : public QObject
 {
@@ -32,6 +33,8 @@ class K9Portage : public QObject
 
 public:
     explicit K9Portage(QObject *parent = nullptr);
+
+    QString arch;
 
     void setRepoFolder(QString path);
     QString repoFolder;
@@ -57,8 +60,19 @@ public:
     QRegularExpression variableAssignment;
     QRegularExpression var_ref;
 
+    QRegularExpression dependBasicRE;
+    QRegularExpression dependVersionRE;
+    QRegularExpression dependSlotRE;
+    QRegularExpression dependRepositoryRE;
+
+    void applyMasks(QSqlDatabase& db);
+
 signals:
 
+
+protected:
+    QString equalFilter(QString& category,QString& package, QString& version);
+    QString comparisonFilter(QString& filter, QString& category, QString& package, QString& version);
 };
 
 #endif // K9PORTAGE_H

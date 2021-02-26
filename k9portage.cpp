@@ -20,6 +20,9 @@
 #include <QDebug>
 #include <QFile>
 #include <QTextStream>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QSqlError>
 
 K9Portage::K9Portage(QObject *parent) : QObject(parent)
 {
@@ -32,6 +35,13 @@ K9Portage::K9Portage(QObject *parent) : QObject(parent)
     verCutSingle.setPattern("\\$\\((ver_cut|get_version_component_range)\\s+([0-9]+)\\)");
     verCutRange.setPattern("\\$\\((ver_cut|get_version_component_range)\\s+([0-9]+)-([0-9]+)\\)");
     var_ref.setPattern("\\$\\{([A-z, 0-9, _]+)\\}");
+
+    dependBasicRE.setPattern("([^~=><].*)/([^:\\n]+)");
+    dependVersionRE.setPattern("(~|=|>=|>|<|<=)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*)");
+    dependSlotRE.setPattern("([^~=><].*)/([^:\\n]+):([^:\\n]+)");
+    dependRepositoryRE.setPattern("(~|=|>=|>|<|<=)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*):([^:]*):([^:\\n]+)");
+
+    arch = "arm64";
 }
 
 void K9Portage::setRepoFolder(QString path)
@@ -115,6 +125,577 @@ void K9Portage::parseVerCut(QString& value)
             value.replace(match.capturedStart(), match.capturedLength(), version.cut(i));
         }
     } while(matchFound);
+}
+
+// refer to https://web.archive.org/web/20201112040501/https://wiki.gentoo.org/wiki/Version_specifier
+// for DEPEND atom syntax
+void K9Portage::applyMasks(QSqlDatabase& db)
+{
+    VersionString vs;
+    QString s;
+    QString filter;
+    QString category;
+    QString package;
+    QString version;
+    QString repo;
+    QString slot;
+    QFile input;
+    QDir dir;
+    QTextStream in;
+    QRegularExpressionMatch match;
+
+    QSqlQuery query(db);
+    db.transaction();
+
+    QString sql = "update PACKAGE set MASKED=1 where ";
+    QString clauses;
+
+    dir.setPath("/etc/portage/package.mask");
+    dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
+    foreach(QString maskFile, dir.entryList())
+    {
+        input.setFileName(QString("%1/%2").arg(dir.path()).arg(maskFile));
+        if(!input.exists() || !input.open(QIODevice::ReadOnly))
+        {
+            qDebug() << input.fileName() << "could not be opened for reading.";
+            continue;
+        }
+
+        in.setDevice(&input);
+        while(in.atEnd() == false)
+        {
+            s = in.readLine();
+            s = s.trimmed();
+            if(s.isEmpty() || s.startsWith('#'))
+            {
+                continue;
+            }
+
+            clauses.clear();
+            match = dependVersionRE.match(s);
+            if(match.hasMatch())
+            {
+                filter = match.captured(1);
+                category = match.captured(2);
+                category.replace("*", "%");
+                package = match.captured(3);
+                package.replace("*", "%");
+                version = match.captured(4);
+                version.replace("*", "%");
+
+                if(filter == "=")
+                {
+                    clauses = equalFilter(category, package, version);
+                    if(clauses.isEmpty())
+                    {
+                        qDebug() << "Empty WHERE clause for:" << s;
+                        continue;
+                    }
+
+                    query.prepare("update PACKAGE set MASKED=1 where " + clauses);
+                    if(category != "%")
+                    {
+                        query.addBindValue(category);
+                    }
+
+                    if(package != "%")
+                    {
+                        query.addBindValue(package);
+                    }
+
+
+                    if(version != "%")
+                    {
+                        query.addBindValue(version);
+                    }
+
+                    if(query.exec() == false)
+                    {
+                        qDebug() << "FAIL:" << query.lastError().text();
+                        qDebug() << "  " << query.executedQuery();
+                    }
+
+                    continue;
+                }
+
+                if(filter == "<=" || filter == ">=" || filter == "<" || filter == ">")
+                {
+                    clauses = comparisonFilter(filter, category, package, version);
+
+                    if(clauses.isEmpty())
+                    {
+                        qDebug() << "Empty WHERE clause for:" << s;
+                        continue;
+                    }
+
+                    query.prepare("update PACKAGE set MASKED=1 where " + clauses);
+                    if(category != "%")
+                    {
+                        query.addBindValue(category);
+                    }
+
+                    if(package != "%")
+                    {
+                        query.addBindValue(package);
+                    }
+
+                    if(query.exec() == false)
+                    {
+                        qDebug() << "FAIL:" << query.lastError().text();
+                        qDebug() << "  " << query.executedQuery();
+                    }
+                    continue;
+                }
+
+                qDebug() << "Unknown mask filter type:" << filter;
+                qDebug() << "  " << s;
+                continue;
+            }
+
+            match = dependBasicRE.match(s);
+            if(match.hasMatch())
+            {
+                category = match.captured(1);
+                category.replace("*", "%");
+                package = match.captured(2);
+                package.replace("*", "%");
+
+                if(category != "%")
+                {
+                    if(category.contains("%"))
+                    {
+                        clauses.append("CATEGORYID in (select CATEGORYID from CATEGORY where CATEGORY like ?)");
+                    }
+                    else
+                    {
+                        clauses.append("CATEGORYID in (select CATEGORYID from CATEGORY where CATEGORY=?)");
+                    }
+                }
+
+                if(package != "%")
+                {
+                    if(clauses.isEmpty() == false)
+                    {
+                        clauses.append(" and ");
+                    }
+
+                    if(package.contains("%"))
+                    {
+                        clauses.append("PACKAGE like ?");
+                    }
+                    else
+                    {
+                        clauses.append("PACKAGE=?");
+                    }
+                }
+
+                if(clauses.isEmpty())
+                {
+                    qDebug() << "Empty WHERE clause for:" << s;
+                    continue;
+                }
+
+                query.prepare("update PACKAGE set MASKED=1 where " + clauses);
+                if(category != "%")
+                {
+                    query.addBindValue(category);
+                }
+
+                if(package != "%")
+                {
+                    query.addBindValue(package);
+                }
+
+                if(query.exec() == false)
+                {
+                    qDebug() << "FAIL:" << query.lastError().text();
+                    qDebug() << "  " << query.executedQuery();
+                }
+                continue;
+            }
+
+            match = dependSlotRE.match(s);
+            if(match.hasMatch())
+            {
+                filter = match.captured(1);
+                category = match.captured(2);
+                category.replace("*", "%");
+                package = match.captured(3);
+                package.replace("*", "%");
+                version = match.captured(4);
+                version.replace("*", "%");
+                slot = match.captured(5);
+                slot.replace("*", "%");
+
+                if(category != "%")
+                {
+                    if(category.contains("%"))
+                    {
+                        clauses.append("CATEGORYID in (select CATEGORYID from CATEGORY where CATEGORY like ?)");
+                    }
+                    else
+                    {
+                        clauses.append("CATEGORYID in (select CATEGORYID from CATEGORY where CATEGORY=?)");
+                    }
+                }
+
+                if(package != "%")
+                {
+                    if(clauses.isEmpty() == false)
+                    {
+                        clauses.append(" and ");
+                    }
+
+                    if(package.contains("%"))
+                    {
+                        clauses.append("PACKAGE like ?");
+                    }
+                    else
+                    {
+                        clauses.append("PACKAGE=?");
+                    }
+                }
+
+                if(slot != "%")
+                {
+                    if(clauses.isEmpty() == false)
+                    {
+                        clauses.append(" and ");
+                    }
+
+                    if(slot.contains("%"))
+                    {
+                        clauses.append("SLOT like ?");
+                    }
+                    else
+                    {
+                        clauses.append("SLOT=?");
+                    }
+                }
+
+                if(clauses.isEmpty())
+                {
+                    qDebug() << "Empty WHERE clause for:" << s;
+                    continue;
+                }
+
+                query.prepare("update PACKAGE set MASKED=1 where " + clauses);
+                if(category != "%")
+                {
+                    query.addBindValue(category);
+                }
+
+                if(package != "%")
+                {
+                    query.addBindValue(package);
+                }
+
+
+                if(slot != "%")
+                {
+                    query.addBindValue(slot);
+                }
+
+                if(query.exec() == false)
+                {
+                    qDebug() << "FAIL:" << query.lastError().text();
+                    qDebug() << "  " << query.executedQuery();
+                }
+
+                continue;
+            }
+
+            match = dependRepositoryRE.match(s);
+            if(match.hasMatch())
+            {
+                filter = match.captured(1);
+                category = match.captured(2);
+                category.replace("*", "%");
+                package = match.captured(3);
+                package.replace("*", "%");
+                version = match.captured(4);
+                version.replace("*", "%");
+                slot = match.captured(5);
+                slot.replace("*", "%");
+                repo = match.captured(6);
+                repo.replace("*", "%");
+
+                if(filter == "=")
+                {
+                    clauses = equalFilter(category, package, version);
+                    if(slot != "%" && slot.isEmpty() == false)
+                    {
+                        if(clauses.isEmpty() == false)
+                        {
+                            clauses.append(" and ");
+                        }
+
+                        if(slot.contains("%"))
+                        {
+                            clauses.append("SLOT like ?");
+                        }
+                        else
+                        {
+                            clauses.append("SLOT=?");
+                        }
+                    }
+
+                    if(repo != "%" && repo.isEmpty() == false)
+                    {
+                        if(clauses.isEmpty() == false)
+                        {
+                            clauses.append(" and ");
+                        }
+
+                        if(repo.contains("%"))
+                        {
+                            clauses.append("REPOID in (select REPOID from REPO where REPO like ?)");
+                        }
+                        else
+                        {
+                            clauses.append("REPOID in (select REPOID from REPO where REPO=?)");
+                        }
+                    }
+
+                    if(clauses.isEmpty())
+                    {
+                        qDebug() << "Empty WHERE clause for:" << s;
+                        continue;
+                    }
+
+                    query.prepare("update PACKAGE set MASKED=1 where " + clauses);
+                    if(category != "%")
+                    {
+                        query.addBindValue(category);
+                    }
+
+                    if(package != "%")
+                    {
+                        query.addBindValue(package);
+                    }
+
+                    if(version != "%")
+                    {
+                        query.addBindValue(version);
+                    }
+
+                    if(slot != "%" && slot.isEmpty() == false)
+                    {
+                        query.addBindValue(slot);
+                    }
+
+                    if(repo != "%" && repo.isEmpty() == false)
+                    {
+                        query.addBindValue(repo);
+                    }
+
+                    if(query.exec() == false)
+                    {
+                        qDebug() << "FAIL:" << query.lastError().text();
+                        qDebug() << "  " << query.executedQuery();
+                    }
+
+                    continue;
+                }
+                else if(filter == "<=" || filter == ">=" || filter == "<" || filter == ">")
+                {
+                    clauses = comparisonFilter(filter, category, package, version);
+                    if(slot != "%" && slot.isEmpty() == false)
+                    {
+                        if(clauses.isEmpty() == false)
+                        {
+                            clauses.append(" and ");
+                        }
+
+                        if(slot.contains("%"))
+                        {
+                            clauses.append("SLOT like ?");
+                        }
+                        else
+                        {
+                            clauses.append("SLOT=?");
+                        }
+                    }
+
+                    if(repo != "%" && repo.isEmpty() == false)
+                    {
+                        if(clauses.isEmpty() == false)
+                        {
+                            clauses.append(" and ");
+                        }
+
+                        if(repo.contains("%"))
+                        {
+                            clauses.append("REPOID in (select REPOID from REPO where REPO like ?)");
+                        }
+                        else
+                        {
+                            clauses.append("REPOID in (select REPOID from REPO where REPO=?)");
+                        }
+                    }
+
+                    if(clauses.isEmpty())
+                    {
+                        qDebug() << "Empty WHERE clause for:" << s;
+                        continue;
+                    }
+
+                    query.prepare("update PACKAGE set MASKED=1 where " + clauses);
+                    if(category != "%")
+                    {
+                        query.addBindValue(category);
+                    }
+
+                    if(package != "%")
+                    {
+                        query.addBindValue(package);
+                    }
+
+                    if(slot != "%" && slot.isEmpty() == false)
+                    {
+                        query.addBindValue(slot);
+                    }
+
+                    if(repo != "%" && repo.isEmpty() == false)
+                    {
+                        query.addBindValue(repo);
+                    }
+
+                    if(query.exec() == false)
+                    {
+                        qDebug() << "FAIL:" << query.lastError().text();
+                        qDebug() << "  " << query.executedQuery();
+                    }
+
+                    continue;
+                }
+
+                qDebug() << "Unknown mask filter type (Depend Repo):" << filter;
+                qDebug() << "  " << s;
+                continue;
+            }
+
+            qDebug() << "Could not parse depend string:";
+            qDebug() << "  " << s;
+            continue;
+        }
+
+        input.close();
+    }
+
+    db.commit();
+}
+
+QString K9Portage::equalFilter(QString& category, QString& package, QString& version)
+{
+    QString clauses;
+
+    if(category != "%")
+    {
+        if(category.contains("%"))
+        {
+            clauses.append("CATEGORYID in (select CATEGORYID from CATEGORY where CATEGORY like ?)");
+        }
+        else
+        {
+            clauses.append("CATEGORYID in (select CATEGORYID from CATEGORY where CATEGORY=?)");
+        }
+    }
+
+    if(package != "%")
+    {
+        if(clauses.isEmpty() == false)
+        {
+            clauses.append(" and ");
+        }
+
+        if(package.contains("%"))
+        {
+            clauses.append("PACKAGE like ?");
+        }
+        else
+        {
+            clauses.append("PACKAGE=?");
+        }
+    }
+
+    if(version != "%")
+    {
+        if(clauses.isEmpty() == false)
+        {
+            clauses.append(" and ");
+        }
+
+        if(version.contains("%"))
+        {
+            clauses.append("VERSION like ?");
+        }
+        else
+        {
+            clauses.append("VERSION=?");
+        }
+    }
+
+    return clauses;
+}
+
+QString K9Portage::comparisonFilter(QString& filter, QString& category, QString& package, QString& version)
+{
+    QString clauses;
+    VersionString vs;
+
+    if(category != "%")
+    {
+        if(category.contains("%"))
+        {
+            clauses.append("CATEGORYID in (select CATEGORYID from CATEGORY where CATEGORY like ?)");
+        }
+        else
+        {
+            clauses.append("CATEGORYID in (select CATEGORYID from CATEGORY where CATEGORY=?)");
+        }
+    }
+
+    if(package != "%")
+    {
+        if(clauses.isEmpty() == false)
+        {
+            clauses.append(" and ");
+        }
+
+        if(package.contains("%"))
+        {
+            clauses.append("PACKAGE like ?");
+        }
+        else
+        {
+            clauses.append("PACKAGE=?");
+        }
+    }
+
+    vs.parse(version);
+
+    if(filter == "<=")
+    {
+        clauses.append(vs.lessThanEqualToSQL());
+    }
+
+    if(filter == ">=")
+    {
+        clauses.append(vs.greaterThanEqualToSQL());
+    }
+
+    if(filter == ">")
+    {
+        clauses.append(vs.greaterThanSQL());
+    }
+
+    if(filter == "<")
+    {
+        clauses.append(vs.lessThanSQL());
+    }
+
+    return clauses;
 }
 
 void K9Portage::ebuildReader(QString fileName)

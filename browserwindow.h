@@ -54,7 +54,7 @@ public slots:
     void exec(QString cmd);
     void install(QString atom);
     void uninstall(QString atom);
-    void openWindow();
+    BrowserWindow* openWindow();
     void reloadDatabase();
     void reloadDatabaseComplete();
 

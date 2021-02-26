@@ -1,4 +1,4 @@
-// Copyright (c) 2021, K9spud LLC.
+﻿// Copyright (c) 2021, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,6 +28,8 @@ public:
     void parse(QString input);
 
     QString cut(int index);
+    QString cutNoRevision(int index);
+    QString revision();
 
     // Package version and revision (if any), for example 6.3, 6.3-r1.
     QString pvr;
@@ -39,8 +41,16 @@ public:
     // Package revision, or r0 if no revision exists.
     QString pr();
 
+    QString greaterThanEqualToSQL();
+    QString lessThanEqualToSQL();
+    QString greaterThanSQL();
+    QString lessThanSQL();
+
     QVector<QString> components;
     QVector<QString> separators;
+
+protected:
+    QString escapeSql(QString s);
 };
 
 #endif // VERSIONSTRING_H

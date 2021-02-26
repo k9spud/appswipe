@@ -22,6 +22,7 @@
 #include "browserwindow.h"
 #include "main.h"
 #include "versionstring.h"
+#include "tabwidget.h"
 
 #include <QAction>
 #include <QMenu>
@@ -48,9 +49,15 @@
 #include <QVariant>
 #include <QScrollBar>
 #include <QTextDocument>
+#include <QProgressBar>
+#include <QResizeEvent>
+#include <QDateTime>
+
+#define PROGRESSBAR_HEIGHT 24
 
 BrowserView::BrowserView(QWidget *parent) : QTextEdit(parent)
 {
+    progress = nullptr;
     status = new QLabel(this);
     status->setStyleSheet(R"EOF(
 padding-left: 1px;
@@ -81,14 +88,17 @@ border-top-left-radius: 8px;
     iconMap["dev"] = ":/img/dev.svg";
     iconMap["games"] = ":/img/games.svg";
     iconMap["gnustep"] = ":/img/gnustep.svg";
+    iconMap["gnome"] = ":/img/gnome.svg";
     iconMap["gui"] = ":/img/x11.svg";
-    //iconMap["mail"] = ":img/.svg";
+    iconMap["kde"] = ":/img/kde.svg";
+    iconMap["mail"] = ":img/mail.svg";
     iconMap["media"] = ":/img/media.svg";
     iconMap["net"] = ":/img/net.svg";
     iconMap["sci"] = ":/img/sci.svg";
     iconMap["sys"] = ":/img/sys.svg";
     iconMap["www"] = ":/img/www.svg";
     iconMap["x11"] = ":/img/x11.svg";
+    iconMap["xfce"] = ":/img/xfce.svg";
 }
 
 QMenu* BrowserView::createStandardContextMenu(const QPoint& position)
@@ -112,14 +122,27 @@ QMenu* BrowserView::createStandardContextMenu(const QPoint& position)
     return menu;
 }
 
-void BrowserView::appendHistory(QString text)
+void BrowserView::appendHistory(QString text, int scrollX, int scrollY)
 {
     while(currentHistory < history.count() - 1)
     {
         history.removeLast();
     }
 
-    history.append(text);
+    History item;
+    if(currentHistory >= 0 && currentHistory < history.count())
+    {
+        item = history.at(currentHistory);
+        item.scrollX = scrollX;
+        item.scrollY = scrollY;
+        history.replace(currentHistory, item);
+    }
+
+    item.target = text;
+    item.scrollX = 0;
+    item.scrollY = 0;
+
+    history.append(item);
     currentHistory++;
 }
 
@@ -133,7 +156,7 @@ QString BrowserView::url()
     QString url;
     if(currentHistory >= 0 && currentHistory < history.count())
     {
-        url = history.at(currentHistory);
+        url = history.at(currentHistory).target;
     }
     return url;
 }
@@ -251,6 +274,25 @@ void BrowserView::delayScroll(int scrollX, int scrollY)
     delayScrolling = true;
 }
 
+void BrowserView::setProgress(int value)
+{
+    if(0 <= value && value < 100)
+    {
+        if(progress == nullptr)
+        {
+            progress = new QProgressBar(this);
+            resizeEvent(nullptr);
+            progress->setVisible(true);
+        }
+        progress->setValue(value);
+    }
+    else
+    {
+        progress->setVisible(false);
+    }
+
+}
+
 void BrowserView::setStatus(QString text)
 {
     if(text != status->text())
@@ -284,6 +326,10 @@ void BrowserView::setStatus(QString text)
         int pad = 14;
         int y = height() - rect.height();
         status->setGeometry(0, y, rect.width() + pad, rect.height());
+        if(progress != nullptr)
+        {
+            progress->setGeometry(width() - 100, height() - PROGRESSBAR_HEIGHT, 100, PROGRESSBAR_HEIGHT);
+        }
         status->setVisible(true);
     }
 }
@@ -298,7 +344,20 @@ void BrowserView::navigateTo(QString text, bool changeHistory, bool feelingLucky
     {
         if(changeHistory && !text.startsWith("install:") && !text.startsWith("uninstall:") && !text.startsWith("unmask:"))
         {
-            appendHistory(text);
+            int scrollX = 0, scrollY = 0;
+            QScrollBar* sb = horizontalScrollBar();
+            if(sb != nullptr)
+            {
+                scrollX = sb->value();
+            }
+
+            sb = verticalScrollBar();
+            if(sb != nullptr)
+            {
+                scrollY = sb->value();
+            }
+
+            appendHistory(text, scrollX, scrollY);
             emit urlChanged(text);
         }
 
@@ -317,7 +376,6 @@ void BrowserView::navigateTo(QString text, bool changeHistory, bool feelingLucky
             setScrollPosition(delayScrollX, delayScrollY);
         }
 
-        setFocus();
     }
 }
 
@@ -337,6 +395,11 @@ void BrowserView::setUrl(const QUrl& url)
         {
             cmd.append(" --ask");
         }
+        /*
+	QString logFile = app.mid(app.indexOf('/') + 1);
+        logFile.prepend(ds->storageFolder);
+        cmd.append(QString(" 2>&1 | tee %1.log").arg(logFile));
+*/
         window->exec(cmd);
         window->install(app);
     }
@@ -378,6 +441,10 @@ void BrowserView::setUrl(const QUrl& url)
     {
         viewFile(url.toLocalFile());
     }
+    else if(scheme == "new")
+    {
+        whatsNew("");
+    }
 }
 
 void BrowserView::back()
@@ -385,23 +452,27 @@ void BrowserView::back()
     qDebug() << "history:";
     QString s;
 
+    History item;
     for(int i = 0; i < history.count(); i++)
     {
-        s = history.at(i);
+        item = history.at(i);
         if(i == currentHistory)
         {
-            qDebug() << "  " << s << "<-- you are here";
+            qDebug() << "  " << item.target << item.scrollX << item.scrollY << "<-- you are here";
         }
         else
         {
-            qDebug() << "  " << s;
+            qDebug() << "  " << item.target << item.scrollX << item.scrollY;
         }
     }
 
     if(currentHistory > 0)
     {
         currentHistory--;
-        navigateTo(history.at(currentHistory), false);
+        History item = history.at(currentHistory);
+        delayScroll(item.scrollX, item.scrollY);
+        navigateTo(item.target, false);
+        emit urlChanged(item.target);
     }
 }
 
@@ -410,7 +481,10 @@ void BrowserView::forward()
     if(currentHistory < (history.count() - 1))
     {
         currentHistory++;
-        navigateTo(history.at(currentHistory), false);
+        History item = history.at(currentHistory);
+        delayScroll(item.scrollX, item.scrollY);
+        navigateTo(item.target, false);
+        emit urlChanged(item.target);
     }
 }
 
@@ -421,13 +495,14 @@ void BrowserView::reload(bool hardReload)
 
     if(history.count())
     {
-        QString text = history.at(currentHistory);
-        if(hardReload && text.startsWith("app:"))
+        History item = history.at(currentHistory);
+        delayScroll(item.scrollX, item.scrollY);
+        if(hardReload && item.target.startsWith("app:"))
         {
-            reloadApp(text);
+            reloadApp(item.target);
         }
 
-        navigateTo(text, false);
+        navigateTo(item.target, false);
     }
     else
     {
@@ -459,7 +534,17 @@ void BrowserView::viewApp(const QUrl& url)
     db.setDatabaseName(ds->storageFolder + ds->databaseFileName);
     db.open();
     QSqlQuery query(db);
-    query.prepare("select r.REPO, p.PACKAGE, p.VERSION, p.DESCRIPTION, p.INSTALLED, p.OBSOLETED, p.SLOT, p.HOMEPAGE, p.LICENSE, P.KEYWORDS, p.IUSE, c.CATEGORY, p.PACKAGE, p.MASKED, p.DOWNLOADSIZE from PACKAGE p inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID inner join REPO r on r.REPOID = p.REPOID where c.CATEGORY=? and p.PACKAGE=? order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 desc");
+    query.prepare(R"EOF(
+select
+    r.REPO, p.PACKAGE, p.VERSION, p.DESCRIPTION, p.INSTALLED, p.OBSOLETED, p.SLOT, p.HOMEPAGE, p.LICENSE,
+    p.KEYWORDS, p.IUSE, c.CATEGORY, p.PACKAGE, p.MASKED, p.DOWNLOADSIZE
+from PACKAGE p
+inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID
+inner join REPO r on r.REPOID = p.REPOID
+where c.CATEGORY=? and p.PACKAGE=?
+order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 desc
+)EOF");
+
     QString search = url.path(QUrl::FullyDecoded);
     QStringList x = search.split('/');
     query.bindValue(0, x.first());
@@ -480,12 +565,16 @@ void BrowserView::viewApp(const QUrl& url)
     QString license;
     QString keywords;
     int downloadSize;
-    QString arch = "arm64";
     QString ebuild;
     QString appicon;
     QString action;
     QString s;
+    QString installedSize;
     QString iuse;
+    QString useFlags;
+    QString cFlags;
+    QString cxxFlags;
+
     QHash<QString, QString> installedVersions;
     QString versionSize;
 
@@ -494,6 +583,7 @@ void BrowserView::viewApp(const QUrl& url)
     html = "<HTML>\n";
     html.append(QString("<HEAD><TITLE>%1</TITLE></HEAD>\n<BODY>").arg(search));
 
+    isWorld = false;
     if(query.exec() && query.first())
     {
         while(1)
@@ -505,6 +595,7 @@ void BrowserView::viewApp(const QUrl& url)
                 category = query.value(11).toString();
                 package = query.value(12).toString();
                 version = query.value(2).toString();
+                iuse = query.value(10).toString();
                 appicon = QString("/var/db/pkg/%1/%2-%3/CONTENTS").arg(category).arg(package).arg(version);
                 QStringList bigIcons;
                 QStringList smallIcons;
@@ -573,14 +664,58 @@ void BrowserView::viewApp(const QUrl& url)
                         hasIcon = true;
                     }
                 }
+
+                s = QString("/var/db/pkg/%1/%2-%3/USE").arg(category).arg(package).arg(version);
+                input.setFileName(s);
+                if(input.open(QIODevice::ReadOnly))
+                {
+                    useFlags = input.readAll();
+                    input.close();
+                }
+
+                s = QString("/var/db/pkg/%1/%2-%3/IUSE").arg(category).arg(package).arg(version);
+                input.setFileName(s);
+                if(input.open(QIODevice::ReadOnly))
+                {
+                    iuse = input.readAll();
+                    input.close();
+                }
+
+                s = QString("/var/db/pkg/%1/%2-%3/CFLAGS").arg(category).arg(package).arg(version);
+                input.setFileName(s);
+                if(input.open(QIODevice::ReadOnly))
+                {
+                    cFlags = input.readAll();
+                    input.close();
+                }
+
+                s = QString("/var/db/pkg/%1/%2-%3/CXXFLAGS").arg(category).arg(package).arg(version);
+                input.setFileName(s);
+                if(input.open(QIODevice::ReadOnly))
+                {
+                    cxxFlags = input.readAll();
+                    input.close();
+                }
                 break;
             }
             else if(query.next() == false)
             {
+                query.first();
                 break;
             }
         }
-        query.first();
+
+        s = QString("/var/lib/portage/world");
+        input.setFileName(s);
+        if(input.open(QIODevice::ReadOnly))
+        {
+            QString worldSet = input.readAll();
+            input.close();
+            if(worldSet.contains(search))
+            {
+                isWorld = true;
+            }
+        }
 
         description = query.value(3).toString();
         homePage = query.value(7).toString();
@@ -599,7 +734,6 @@ void BrowserView::viewApp(const QUrl& url)
         }
         license = query.value(8).toString();
         keywords = query.value(9).toString();
-        iuse = query.value(10).toString();
         category = query.value(11).toString();
         package = query.value(12).toString();
         if(hasIcon == false)
@@ -631,8 +765,13 @@ void BrowserView::viewApp(const QUrl& url)
         }
 
         html.append("<P><TABLE BORDER=0 CLASS=\"normal\">");
-        html.append("<TR><TD><B>Repository&nbsp;&nbsp;</B></TD><TD><B>Slot&nbsp;&nbsp;</B></TD><TD><B>Version&nbsp;&nbsp;</B></TD><TD><B>Status</B></TD></TR>\n");
-        html.append("<TR><TD><HR></TD><TD><HR></TD><TD><HR></TD><TD><HR></TD></TR>");
+        html.append("<TR><TD><B>Repository&nbsp;&nbsp;</B></TD><TD><B>Slot&nbsp;&nbsp;</B></TD><TD><B>Version&nbsp;&nbsp;</B></TD><TD><B>Status</B>");
+        if(isWorld)
+        {
+            html.append(" (@world member)");
+        }
+        html.append("</TD></TR>\n<TR><TD><HR></TD><TD><HR></TD><TD><HR></TD><TD><HR></TD></TR>");
+        query.first();
         do
         {
             repo = query.value(0).toString();
@@ -642,6 +781,32 @@ void BrowserView::viewApp(const QUrl& url)
             masked = query.value(13).toBool();
             slot = query.value(6).toString();
             downloadSize = query.value(14).toInt();
+            if(downloadSize != -1)
+            {
+                if(downloadSize > 1024 * 1024 * 1024)
+                {
+                    float size = static_cast<float>(downloadSize) / (1024.0f * 1024.0f * 1024.0f);
+                    installedSize = QString(", %1 GB").arg(QString::number(size, 'f', 2));
+                }
+                else if(downloadSize > 1024 * 1024)
+                {
+                    float size = static_cast<float>(downloadSize) / (1024.0f * 1024.0f);
+                    installedSize = QString(", %1 MB").arg(QString::number(size, 'f', 1));
+                }
+                else if(downloadSize > 1024)
+                {
+                    float size = static_cast<float>(downloadSize) / (1024.0f);
+                    installedSize = QString(", %1 KB").arg(QString::number(size, 'f', 1));
+                }
+                else
+                {
+                    installedSize = QString(", %1 bytes").arg(downloadSize);
+                }
+            }
+            else
+            {
+                installedSize.clear();
+            }
 
             if(installed)
             {
@@ -653,7 +818,11 @@ void BrowserView::viewApp(const QUrl& url)
             }
 
             s = query.value(9).toString();
-            if(!s.contains(arch))
+            if(masked)
+            {
+                s = "masked";
+            }
+            else if(!s.contains(portage->arch))
             {
                 if(s.contains("-*"))
                 {
@@ -666,25 +835,19 @@ void BrowserView::viewApp(const QUrl& url)
             }
             else
             {
-                if(masked)
+                int i = s.indexOf(portage->arch);
+                if(i == 0 || s.at(i - 1) == ' ')
                 {
-                    s = "masked";
+                    s = "stable";
                 }
-                else
+                else if(i > 0 && s.at(i-1) == '~')
                 {
-                    int i = s.indexOf(arch);
-                    if(i == 0 || s.at(i - 1) == ' ')
-                    {
-                        s = "stable";
-                    }
-                    else if(i > 0 && s.at(i-1) == '~')
-                    {
-                        s = "testing";
-                    }
+                    s = "testing";
                 }
             }
 
-            s = s + (obsoleted ? " (obsolete)" : installed ? " (installed)" : "");
+            s = s + (obsoleted ? " (obsolete" + installedSize + ")" :
+                     installed ? " (installed" + installedSize + ")" : "");
             if(installed)
             {
                 action = "uninstall";
@@ -702,31 +865,6 @@ void BrowserView::viewApp(const QUrl& url)
             }
 
             versionSize = QString("<A HREF=\"%1:%2/%3-%4\">%4</A>").arg(action).arg(category).arg(package).arg(version);
-            if(downloadSize != -1)
-            {
-                versionSize.append(" (");
-                if(downloadSize > 1024 * 1024 * 1024)
-                {
-                    float size = static_cast<float>(downloadSize) / (1024.0f * 1024.0f * 1024.0f);
-                    versionSize.append(QString::number(size, 'f', 1) + "GB");
-                    versionSize.append(QString::number(downloadSize / (1024*1024*1024)) + "GB");
-                }
-                else if(downloadSize > 1024 * 1024)
-                {
-                    float size = static_cast<float>(downloadSize) / (1024.0f * 1024.0f);
-                    versionSize.append(QString::number(size, 'f', 1) + "MB");
-                }
-                else if(downloadSize > 1024)
-                {
-                    versionSize.append(QString::number(downloadSize / (1024)) + "KB");
-                }
-                else
-                {
-                    versionSize.append(QString::number(downloadSize));
-                }
-                versionSize.append(")");
-            }
-
             html.append("<TR>");
             html.append(QString("<TD><A HREF=\"file://%2\">%1</A>&nbsp;&nbsp;</TD>").arg(repo).arg(ebuild));
             html.append(QString("<TD>%2&nbsp;&nbsp;</TD>").arg(slot));
@@ -736,9 +874,35 @@ void BrowserView::viewApp(const QUrl& url)
         } while(query.next());
         html.append("</TABLE></P>\n");
 
-        html.append(QString("<P><B>License:</B> %1</P>").arg(license));
-        html.append(QString("<P><B>IUSE:</B> %1</P>").arg(iuse));
-        html.append(QString("<P><B>Keywords:</B> %1</P>").arg(keywords));
+        if(license.isEmpty() == false)
+        {
+            html.append(QString("<P><B>License:</B> %1</P>").arg(license));
+        }
+
+        if(useFlags.isEmpty() == false)
+        {
+            html.append(QString("<P><B>USE:</B> %1</P>").arg(useFlags));
+        }
+
+        if(iuse.isEmpty() == false)
+        {
+            html.append(QString("<P><B>IUSE:</B> %1</P>").arg(iuse));
+        }
+
+        if(cFlags.isEmpty() == false)
+        {
+            html.append(QString("<P><B>CFLAGS:</B> %1</P>").arg(cFlags));
+        }
+
+        if(cxxFlags.isEmpty() == false && cxxFlags != cFlags)
+        {
+            html.append(QString("<P><B>CXXFLAGS:</B> %1</P>").arg(cxxFlags));
+        }
+
+        if(keywords.isEmpty() == false)
+        {
+            html.append(QString("<P><B>Keywords:</B> %1</P>").arg(keywords));
+        }
     }
 
     html.append("</BODY>\n<HTML>\n");
@@ -749,6 +913,7 @@ void BrowserView::viewApp(const QUrl& url)
     {
         emit titleChanged(documentTitle());
     }
+    setFocus();
 }
 
 void BrowserView::reloadApp(const QUrl& url)
@@ -787,13 +952,14 @@ void BrowserView::reloadApp(const QUrl& url)
     }
 
     QString category = x.first();
-    QString reloadPackage = x.last();
+    QString packageName = x.last();
     QString categoryPath;
     QString buildsPath;
-    QString packageName;
     QString ebuildFilePath;
     QString data;
     QString installedFilePath;
+    QString repoFilePath;
+    QString repo;
     qint64 installed;
     qint64 published;
     QFileInfo fi;
@@ -818,88 +984,90 @@ values
     query.prepare(sql);
     for(int repoId = 0; repoId < portage->repos.count(); repoId++)
     {
-        qDebug() << "Scanning repo:" << portage->repos.at(repoId);
-
         categoryPath = portage->repos.at(repoId);
-        categoryPath.append(category);
-        dir.setPath(categoryPath);
-        foreach(packageName, dir.entryList(QDir::AllDirs | QDir::NoDotAndDotDot))
-        {
-            if(packageName != reloadPackage)
-            {
-                continue;
-            }
-///////////////////////////////////////////////////////// start of duplicate code in rescanthread.cpp
-            buildsPath = categoryPath;
-            buildsPath.append('/');
-            buildsPath.append(packageName);
-            builds.setPath(buildsPath);
-            builds.setNameFilters(QStringList("*.ebuild"));
-            foreach(ebuildFilePath, builds.entryList(QDir::Files))
-            {
-                portage->vars.clear();
-                portage->vars["PN"] = packageName;
-                portage->setVersion(ebuildFilePath.mid(packageName.length() + 1, ebuildFilePath.length() - (7 + packageName.length() + 1)));
+        qDebug() << "Scanning repo:" << categoryPath;
 
-                downloadSize = -1;
-                installed = 0;
-                installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(category).arg(packageName).arg(portage->version.pvr);
-                fi.setFile(installedFilePath);
-                if(fi.exists())
+        categoryPath.append(category);
+///////////////////////////////////////////////////////// start of duplicate code in rescanthread.cpp
+        buildsPath = categoryPath;
+        buildsPath.append('/');
+        buildsPath.append(packageName);
+        builds.setPath(buildsPath);
+        builds.setNameFilters(QStringList("*.ebuild"));
+        foreach(ebuildFilePath, builds.entryList(QDir::Files))
+        {
+            portage->vars.clear();
+            portage->vars["PN"] = packageName;
+            portage->setVersion(ebuildFilePath.mid(packageName.length() + 1, ebuildFilePath.length() - (7 + packageName.length() + 1)));
+
+            downloadSize = -1;
+            installed = 0;
+            installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(category).arg(packageName).arg(portage->version.pvr);
+            fi.setFile(installedFilePath);
+            if(fi.exists())
+            {
+                repoFilePath = QString("%1/repository").arg(installedFilePath);
+                input.setFileName(repoFilePath);
+                if(input.open(QIODevice::ReadOnly))
                 {
-                    installed = fi.birthTime().toSecsSinceEpoch();
-                    input.setFileName(QString("%1/SIZE").arg(installedFilePath));
-                    if(input.open(QIODevice::ReadOnly))
+                    data = input.readAll();
+                    input.close();
+                    data = data.trimmed();
+                    repo = QString("/var/db/repos/%1/").arg(data);
+                    if(repo == portage->repos.at(repoId))
                     {
-                        data = input.readAll();
-                        input.close();
-                        data = data.trimmed();
-                        downloadSize = data.toInt(&ok);
-                        if(ok == false)
+                        installed = fi.birthTime().toSecsSinceEpoch();
+                        input.setFileName(QString("%1/SIZE").arg(installedFilePath));
+                        if(input.open(QIODevice::ReadOnly))
                         {
-                            downloadSize = -1;
+                            data = input.readAll();
+                            input.close();
+                            data = data.trimmed();
+                            downloadSize = data.toInt(&ok);
+                            if(ok == false)
+                            {
+                                downloadSize = -1;
+                            }
                         }
                     }
                 }
+            }
 
-                fi.setFile(buildsPath + "/" + ebuildFilePath);
-                published = fi.birthTime().toSecsSinceEpoch();
+            fi.setFile(buildsPath + "/" + ebuildFilePath);
+            published = fi.birthTime().toSecsSinceEpoch();
 
-                portage->ebuildReader(buildsPath + "/" + ebuildFilePath);
+            portage->ebuildReader(buildsPath + "/" + ebuildFilePath);
 
-                query.bindValue(0, category);
-                query.bindValue(1, repoId);
-                query.bindValue(2, packageName);
-                query.bindValue(3, portage->var("DESCRIPTION"));
-                query.bindValue(4, portage->var("HOMEPAGE"));
-                query.bindValue(5, portage->version.pvr);
-                query.bindValue(6, portage->version.cut(0));
-                query.bindValue(7, portage->version.cut(1));
-                query.bindValue(8, portage->version.cut(2));
-                query.bindValue(9, portage->version.cut(3));
-                query.bindValue(10, portage->version.cut(4));
-                query.bindValue(11, portage->var("PR"));
-                query.bindValue(12, portage->var("SLOT"));
-                query.bindValue(13, portage->var("LICENSE"));
-                query.bindValue(14, installed);
-                query.bindValue(15, downloadSize);
-                query.bindValue(16, portage->var("KEYWORDS"));
-                query.bindValue(17, portage->var("IUSE"));
-                query.bindValue(18, published);
-                if(query.exec() == false)
-                {
-                    qDebug() << "Query failed:" << query.executedQuery() << query.lastError().text();
-                    db.rollback();
-                    return;
-                }
+            query.bindValue(0, category);
+            query.bindValue(1, repoId);
+            query.bindValue(2, packageName);
+            query.bindValue(3, portage->var("DESCRIPTION"));
+            query.bindValue(4, portage->var("HOMEPAGE"));
+            query.bindValue(5, portage->version.pvr);
+            query.bindValue(6, portage->version.cutNoRevision(0));
+            query.bindValue(7, portage->version.cutNoRevision(1));
+            query.bindValue(8, portage->version.cutNoRevision(2));
+            query.bindValue(9, portage->version.cutNoRevision(3));
+            query.bindValue(10, portage->version.cutNoRevision(4));
+            query.bindValue(11, portage->version.revision());
+            query.bindValue(12, portage->var("SLOT"));
+            query.bindValue(13, portage->var("LICENSE"));
+            query.bindValue(14, installed);
+            query.bindValue(15, downloadSize);
+            query.bindValue(16, portage->var("KEYWORDS"));
+            query.bindValue(17, portage->var("IUSE"));
+            query.bindValue(18, published);
+            if(query.exec() == false)
+            {
+                qDebug() << "Query failed:" << query.executedQuery() << query.lastError().text();
+                db.rollback();
+                return;
             }
         }
     }
 
-    QString repoFilePath;
     bool obsolete;
     int repoId = 0;
-    QString repo;
     query.prepare(R"EOF(
 insert into PACKAGE
 (
@@ -917,11 +1085,13 @@ values
     QRegularExpression pvsplit;
     pvsplit.setPattern("(.+)-([0-9][0-9,\\-,\\.,[A-z]*)");
     QString package;
+    QStringList packageNameFilter;
+    packageNameFilter << QString("%1-*").arg(packageName);
 
     qDebug() << "Scanning installed packages...";
     categoryPath = QString("/var/db/pkg/%1/").arg(category);
     dir.setPath(categoryPath);
-    foreach(package, dir.entryList(QDir::AllDirs | QDir::NoDotAndDotDot))
+    foreach(package, dir.entryList(packageNameFilter, QDir::Dirs | QDir::NoDotAndDotDot))
     {
         portage->vars.clear();
         portage->vars["PN"] = packageName = package;
@@ -935,11 +1105,6 @@ values
         else
         {
             portage->setVersion("0-0-0-0");
-        }
-
-        if(packageName != reloadPackage)
-        {
-            continue;
         }
 
         buildsPath = categoryPath;
@@ -1009,12 +1174,12 @@ values
             query.bindValue(3, portage->var("DESCRIPTION"));
             query.bindValue(4, portage->var("HOMEPAGE"));
             query.bindValue(5, portage->version.pvr);
-            query.bindValue(6, portage->version.cut(0));
-            query.bindValue(7, portage->version.cut(1));
-            query.bindValue(8, portage->version.cut(2));
-            query.bindValue(9, portage->version.cut(3));
-            query.bindValue(10, portage->version.cut(4));
-            query.bindValue(11, portage->version.pr());
+            query.bindValue(6, portage->version.cutNoRevision(0));
+            query.bindValue(7, portage->version.cutNoRevision(1));
+            query.bindValue(8, portage->version.cutNoRevision(2));
+            query.bindValue(9, portage->version.cutNoRevision(3));
+            query.bindValue(10, portage->version.cutNoRevision(4));
+            query.bindValue(11, portage->version.revision());
             query.bindValue(12, portage->var("SLOT"));
             query.bindValue(13, portage->var("LICENSE"));
             query.bindValue(14, installed);
@@ -1033,93 +1198,8 @@ values
     }
 
     db.commit();
-/*
-    db.transaction();
-    if(query.exec("update PACKAGE set MASKED=1 where VERSION like '%9999%'") == false)
-    {
-        db.rollback();
-        return;
-    }
-
-    if(query.exec("update PACKAGE set MASKED=1 where VERSION like '%_alpha%'") == false)
-    {
-        db.rollback();
-        return;
-    }
-
-    if(query.exec("update PACKAGE set MASKED=1 where VERSION like '%_beta%'") == false)
-    {
-        db.rollback();
-        return;
-    }
-    db.commit();
-*/
+    portage->applyMasks(db);
     qDebug() << "Reload" << search << "completed.";
-}
-
-void BrowserView::printApp(QString& result, QHash<QString, QString>& installedVersions, QHash<QString, QString>& obsoletedVersions, QStringList& apps, QSqlQuery& query)
-{
-    QString app = query.value(0).toString() + "/" + query.value(1).toString();
-    QString version = query.value(2).toString();
-    bool masked = query.value(5).toBool();
-
-    if(apps.contains(app) || masked)
-    {
-        return;
-    }
-
-    apps.append(app);
-    if(installedVersions[app].isEmpty() && obsoletedVersions[app].isEmpty())
-    {
-        // no versions of this app have been installed
-        result.append(QString("<P><A HREF=\"app:%1/%2\">%1/%2</A><BR>").arg(query.value(0).toString()).arg(query.value(1).toString()));
-    }
-    else
-    {
-        result.append(QString("<P><B><A HREF=\"app:%1/%2\">%1/%2-%3</A> (").arg(query.value(0).toString()).arg(query.value(1).toString()).arg(query.value(2).toString()));
-
-        if(installedVersions[app] == version)
-        {
-            if(obsoletedVersions[app].isEmpty())
-            {
-                // latest version of app is installed, no obsoleted versions.
-                result.append(QString("installed)</B><BR>"));
-            }
-            else
-            {
-                // latest version of app is installed, along with one or more obsoleted versions.
-                result.append(QString("installed, obsolete %1)</B><BR>").arg(obsoletedVersions[app].trimmed()));
-            }
-        }
-        else
-        {
-            if(installedVersions[app].isEmpty())
-            {
-                // only obsoleted version(s) are installed
-                result.append(QString("obsolete %1)</B><BR>").arg(obsoletedVersions[app].trimmed()));
-            }
-            else
-            {
-                if(obsoletedVersions[app].isEmpty())
-                {
-                    // no obsoleted versions installed
-                    result.append(QString("installed %1)</B><BR>").arg(installedVersions[app].trimmed()));
-                }
-                else
-                {
-                    // both supported and obsoleted versions installed
-                    result.append(QString("installed %1, obsolete %2)</B><BR>").arg(installedVersions[app].trimmed()).arg(obsoletedVersions[app].trimmed()));
-                }
-            }
-        }
-    }
-
-    QString description = query.value(3).toString();
-    if(description.isEmpty())
-    {
-        description = "(no description available)";
-    }
-    result.append(QString("%1</P>").arg(description));
 }
 
 void BrowserView::searchApps(QString search, bool feelingLucky)
@@ -1141,22 +1221,9 @@ void BrowserView::searchApps(QString search, bool feelingLucky)
     db.setDatabaseName(ds->storageFolder + ds->databaseFileName);
     db.open();
 
-    QStringList apps;
-    QString app;
-    QString package;
-    QString result;
-    QString installedApps;
-    QString availableApps;
-    bool installed;
-    bool obsoleted;
-    bool tooManyResults = false;
-
-    QVector<int> skipApps;
-    QHash<QString, QString> installedVersions;
-    QHash<QString, QString> obsoletedVersions;
-
-    result = "<HTML>\n";
+    QString result = "<HTML>\n";
     result.append(QString("<HEAD><TITLE>%1 search</TITLE></HEAD>\n<BODY>").arg(search));
+
     QSqlQuery query(db);
     QString glob = search.replace('*', "%");
     if(search.contains('/'))
@@ -1174,119 +1241,50 @@ void BrowserView::searchApps(QString search, bool feelingLucky)
         query.bindValue(2, glob);
     }
 
-    if(query.exec())
-    {
-        while(query.next())
-        {
-            package = query.value(1).toString();
-            app = query.value(0).toString() + "/" + package;
-
-            if(apps.contains(app) == false)
-            {
-                apps.append(app);
-
-                if(search.contains('/') == false && package == search)
-                {
-                    skipApps.prepend(query.at());
-                }
-            }
-
-            installed = query.value(4).toInt() != 0;
-            obsoleted = query.value(6).toInt() != 0;
-            if(obsoleted)
-            {
-                if(obsoletedVersions[app].isEmpty())
-                {
-                    obsoletedVersions[app] = query.value(2).toString();
-                }
-                else
-                {
-                    obsoletedVersions[app].append(", " + query.value(2).toString());
-                }
-            }
-            else if(installed)
-            {
-                if(installedVersions[app].isEmpty())
-                {
-                    installedVersions[app] = query.value(2).toString();
-                }
-                else
-                {
-                    installedVersions[app].append(", " + query.value(2).toString());
-                }
-            }
-        }
-
-        if(apps.count() == 0)
-        {
-            error("No results found.");
-            return;
-        }
-        else if(apps.count() == 1 || feelingLucky)
-        {
-            if(skipApps.count())
-            {
-                query.seek(skipApps.first());
-            }
-            else
-            {
-                query.first();
-            }
-            QString app = QString("app:%1/%2").arg(query.value(0).toString()).arg(query.value(1).toString());
-            history[currentHistory] = app;
-            emit urlChanged(app);
-            viewApp(app);
-            return;
-        }
-        else
-        {
-            query.last();
-            if(query.at() >= 9999)
-            {
-                tooManyResults = true;
-            }
-
-            apps.clear();
-            foreach(int i, skipApps)
-            {
-                query.seek(i);
-                printApp(result, installedVersions, obsoletedVersions, apps, query);
-            }
-
-            query.first();
-            QString app;
-            do
-            {
-                app = query.value(0).toString() + "/" + query.value(1).toString();
-                if(installedVersions[app].isEmpty() && obsoletedVersions[app].isEmpty())
-                {
-                    printApp(availableApps, installedVersions, obsoletedVersions, apps, query);
-                }
-                else
-                {
-                    printApp(installedApps, installedVersions, obsoletedVersions, apps, query);
-                }
-            } while(query.next());
-        }
-    }
-    result.append(installedApps);
-    result.append(availableApps);
-
-    if(tooManyResults)
-    {
-        result.append("<P>Further search results truncated...</P>\n");
-    }
-    result.append("\n");
-    result.append("</BODY>\n<HTML>\n");
-
-    QString oldTitle = documentTitle();
-    setText(result);
-    if(documentTitle() != oldTitle)
-    {
-        emit titleChanged(documentTitle());
-    }
     setIcon(":/img/search.svg");// ":/img/search.svg"
+    showQueryResult(&query, result, search, feelingLucky);
 }
+
+void BrowserView::whatsNew(QString search, bool feelingLucky)
+{
+    QSqlDatabase db;
+    if(QSqlDatabase::contains("GuiThread") == false)
+    {
+        db = QSqlDatabase::addDatabase("QSQLITE", "GuiThread");
+    }
+    else
+    {
+        db = QSqlDatabase::database("GuiThread");
+        if(db.isValid())
+        {
+            db.close();
+        }
+    }
+
+    db.setDatabaseName(ds->storageFolder + ds->databaseFileName);
+    db.open();
+
+    QString result = "<HTML>\n";
+    result.append(QString("<HEAD><TITLE>What's New</TITLE></HEAD>\n<BODY>"));
+
+    QSqlQuery query(db);
+    QString glob = search.replace('*', "%");
+    query.prepare(R"EOF(
+select c.CATEGORY, p.PACKAGE, p.VERSION, p.DESCRIPTION, p.INSTALLED, p.MASKED, p.OBSOLETED
+from PACKAGE p
+inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID
+where (p.PACKAGE, p.CATEGORYID) in (select p2.PACKAGE, p2.CATEGORYID from PACKAGE p2 where p2.PUBLISHED > ?)
+order by c.CATEGORY, p.PACKAGE, p.MASKED, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 desc
+limit 10000;
+)EOF");
+    QDateTime dt = QDateTime::currentDateTime();
+    dt = dt.addDays(-3);
+    query.bindValue(0, dt.toSecsSinceEpoch());
+
+    setIcon(":/img/new.svg");
+    showQueryResult(&query, result, search, feelingLucky);
+}
+
 
 void BrowserView::mousePressEvent(QMouseEvent* event)
 {
@@ -1381,8 +1379,8 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
     {
         menu = new QMenu("Browser Menu", this);
 
-        QUrl url(context);
-        QString urlPath = url.path(QUrl::FullyDecoded);
+        QUrl contextUrl(context);
+        QString urlPath = contextUrl.path(QUrl::FullyDecoded);
 
         if(context.startsWith("http"))
         {
@@ -1394,7 +1392,7 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             });
             menu->addAction(action);
 
-            action = new QAction("Open link in browser", this);
+            action = new QAction("Open link in external browser", this);
             connect(action, &QAction::triggered, this, [this]()
             {
                 shell->externalBrowser(context);
@@ -1408,6 +1406,22 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             {
                 QClipboard* clip = qApp->clipboard();
                 clip->setText(urlPath);
+            });
+            menu->addAction(action);
+
+            action = new QAction("Open link in new tab", this);
+            connect(action, &QAction::triggered, this, [this]()
+            {
+                BrowserView* view = window->tabWidget()->createTab();
+                view->navigateTo(context);
+            });
+            menu->addAction(action);
+
+            action = new QAction("Open link in new window", this);
+            connect(action, &QAction::triggered, this, [this]()
+            {
+                BrowserWindow* newWindow = window->openWindow();
+                newWindow->currentView()->navigateTo(context);
             });
             menu->addAction(action);
 
@@ -1442,10 +1456,9 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             {
                 QUrl url(context);
                 QString app = url.path(QUrl::FullyDecoded);
-                shell->externalTerm(QString("qlist =%1").arg(app));
+                shell->externalTerm(QString("qlist =%1 | less").arg(app));
             });
             menu->addAction(action);
-
 
             action = new QAction("Who depends on this?", this);
             connect(action, &QAction::triggered, this, [this]()
@@ -1461,7 +1474,7 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             {
                 QUrl url(context);
                 QString app = url.path(QUrl::FullyDecoded);
-                shell->externalTerm(QString("equery depgraph =%1").arg(app));
+                shell->externalTerm(QString("equery depgraph =%1  | less").arg(app));
             });
             menu->addAction(action);
 
@@ -1474,12 +1487,22 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             });
             menu->addAction(action);
 
+            action = new QAction("Reinstall", this);
+            connect(action, &QAction::triggered, this, [this]()
+            {
+                QUrl url(context);
+                QString app = url.path(QUrl::FullyDecoded);
+                QString cmd = "sudo emerge =" + app + " --verbose --verbose-conflicts --nospinner --ask";
+                shell->externalTerm(cmd);
+            });
+            menu->addAction(action);
+
             action = new QAction("Reinstall from source", this);
             connect(action, &QAction::triggered, this, [this]()
             {
                 QUrl url(context);
                 QString app = url.path(QUrl::FullyDecoded);
-                QString cmd = "sudo emerge =" + app + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
+                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + app + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
                 shell->externalTerm(cmd);
             });
             menu->addAction(action);
@@ -1504,10 +1527,52 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             });
             menu->addAction(action);
         }
+        else if(context.startsWith("app:"))
+        {
+            action = new QAction("Open link in new tab", this);
+            connect(action, &QAction::triggered, this, [this]()
+            {
+                BrowserView* view = window->tabWidget()->createTab();
+                view->navigateTo(context);
+            });
+            menu->addAction(action);
+
+            action = new QAction("Open link in new window", this);
+            connect(action, &QAction::triggered, this, [this]()
+            {
+                BrowserWindow* newWindow = window->openWindow();
+                newWindow->currentView()->navigateTo(context);
+            });
+            menu->addAction(action);
+        }
         else
         {
             delete menu;
             menu = nullptr;
+        }
+    }
+    else if(url().startsWith("app:"))
+    {
+        QString urlPath = url().mid(4);
+
+        menu = new QMenu("App Menu", this);
+        action = new QAction("Copy atom to clipboard", this);
+        connect(action, &QAction::triggered, this, [this, urlPath]()
+        {
+            QClipboard* clip = qApp->clipboard();
+            clip->setText(urlPath);
+        });
+        menu->addAction(action);
+
+        if(isWorld == false)
+        {
+            action = new QAction("Add to @world set", this);
+            connect(action, &QAction::triggered, this, [this, urlPath]()
+            {
+                QString cmd = "sudo emerge --noreplace " + urlPath + " --verbose --verbose-conflicts --nospinner --ask=n";
+                shell->externalTerm(cmd);
+            });
+            menu->addAction(action);
         }
     }
 
@@ -1515,6 +1580,323 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
     {
         menu->popup(event->globalPos());
     }
+}
+
+void BrowserView::resizeEvent(QResizeEvent* event)
+{
+    QTextEdit::resizeEvent(event);
+
+    QFont font = status->font();
+    font = QFont("Roboto", 13);
+
+    QFontMetrics fm(font);
+    QRect rect = fm.boundingRect(status->text());
+    int maxWidth = width() - verticalScrollBar()->width();
+    int lineHeight = rect.height();
+    if(rect.width() > maxWidth)
+    {
+        //rect.setHeight(lineHeight * 4);
+        rect.setHeight(lineHeight * (rect.width() / maxWidth + 1));
+        rect.setWidth(maxWidth);
+        rect = fm.boundingRect(rect, Qt::TextWordWrap, status->text());
+        status->setWordWrap(true);
+    }
+    else
+    {
+        status->setWordWrap(false);
+    }
+    int pad = 14;
+    int y = height() - rect.height();
+    status->setGeometry(0, y, rect.width() + pad, rect.height());
+    if(progress != nullptr)
+    {
+        progress->setGeometry(width() - 100, height() - PROGRESSBAR_HEIGHT, 100, PROGRESSBAR_HEIGHT);
+    }
+}
+
+void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString search, bool feelingLucky)
+{
+    QString category;
+    QString app;
+    QString package;
+    QString version;
+    QString description;
+    int bestYet = -1;
+    QString bestCategory;
+    QString bestPackage;
+    QString nextCategory;
+    QString nextPackage;
+
+    QString bestMatchApps;
+    QString obsoletedApps;
+    QString installedApps;
+    QString availableApps;
+
+    bool installed;
+    bool obsoleted;
+    bool bestMatched = false;
+    bool masked;
+    bool tooManyResults = false;
+    int appCount = 0;
+
+    QString latestUnmaskedVersion;
+    QStringList obsoletedVersions;
+    QStringList installedVersions;
+    bool exitLoop = false;
+
+    if(query->exec() == false || query->first() == false)
+    {
+        error("No results found.");
+        return;
+    }
+    category = query->value(0).toString();
+    package = query->value(1).toString();
+    installedVersions.clear();
+    obsoletedVersions.clear();
+    latestUnmaskedVersion.clear();
+    bestMatched = false;
+    if(search.contains('/') == false && package == search)
+    {
+        bestMatched = true;
+    }
+
+    while(exitLoop == false)
+    {
+        version = query->value(2).toString();
+        if(installedVersions.isEmpty())
+        {
+            description = query->value(3).toString();
+        }
+        installed = (query->value(4).toInt() != 0);
+        masked = (query->value(5).toInt() != 0);
+        obsoleted = (query->value(6).toInt() != 0);
+
+        if(masked == false && latestUnmaskedVersion.isEmpty())
+        {
+            latestUnmaskedVersion = version;
+        }
+
+        if(obsoleted)
+        {
+            obsoletedVersions.append(version);
+        }
+        else if(installed)
+        {
+            installedVersions.append(version);
+        }
+
+        if(query->next() == false)
+        {
+            exitLoop = true;
+        }
+        else
+        {
+            nextCategory = query->value(0).toString();
+            nextPackage = query->value(1).toString();
+        }
+
+        if(exitLoop || nextCategory != category || nextPackage != package)
+        {
+            if(package.isEmpty() == false)
+            {
+                app = QString("%1/%2").arg(category).arg(package);
+                if(bestMatched)
+                {
+                    bestCategory = category;
+                    bestPackage = package;
+                    bestYet = 100;
+                    if(feelingLucky)
+                    {
+                        break;
+                    }
+                    printApp(bestMatchApps, app, description, latestUnmaskedVersion, installedVersions, obsoletedVersions);
+                }
+                else if(obsoletedVersions.count() || (installedVersions.count() && (installedVersions.contains(latestUnmaskedVersion) == false)))
+                {
+                    if(bestYet < 50)
+                    {
+                        bestYet = 50;
+                        bestPackage = package;
+                        bestCategory = category;
+                    }
+                    printApp(obsoletedApps, app, description, latestUnmaskedVersion, installedVersions, obsoletedVersions);
+                }
+                else if(installedVersions.count())
+                {
+                    if(bestYet < 25)
+                    {
+                        bestYet = 25;
+                        bestPackage = package;
+                        bestCategory = category;
+                    }
+                    printApp(installedApps, app, description, latestUnmaskedVersion, installedVersions, obsoletedVersions);
+                }
+                else
+                {
+                    if(bestYet < 5)
+                    {
+                        bestYet = 5;
+                        bestPackage = package;
+                        bestCategory = category;
+                    }
+                    printApp(availableApps, app, description, latestUnmaskedVersion, installedVersions, obsoletedVersions);
+                }
+
+                appCount++;
+                if(appCount > 9999)
+                {
+                    tooManyResults = true;
+                    break;
+                }
+            }
+
+            category = nextCategory;
+            package = nextPackage;
+            installedVersions.clear();
+            obsoletedVersions.clear();
+            latestUnmaskedVersion.clear();
+            bestMatched = false;
+            if(search.contains('/') == false && package == search)
+            {
+                bestMatched = true;
+            }
+        }
+    }
+
+    if(appCount == 0)
+    {
+        error("No results found.");
+        return;
+    }
+
+    if(appCount == 1 || feelingLucky)
+    {
+        History item;
+        item.target = QString("app:%1/%2").arg(bestCategory).arg(bestPackage);
+        item.scrollX = 0;
+        item.scrollY = 0;
+        history[currentHistory] = item;
+        emit urlChanged(item.target);
+        viewApp(item.target);
+        return;
+    }
+
+    result.append(bestMatchApps);
+    result.append(obsoletedApps);
+    result.append(installedApps);
+    result.append(availableApps);
+
+    if(tooManyResults)
+    {
+        result.append("<P>Further search results truncated...</P>\n");
+    }
+    result.append("\n");
+    result.append("</BODY>\n<HTML>\n");
+
+    QString oldTitle = documentTitle();
+    setText(result);
+    if(documentTitle() != oldTitle)
+    {
+        emit titleChanged(documentTitle());
+    }
+
+    setFocus();
+}
+
+void BrowserView::printApp(QString& result, QString& app, QString& description, QString& latestVersion, QStringList& installedVersions, QStringList& obsoletedVersions)
+{
+    int i;
+
+    QString obsoleted;
+    QString installed;
+    for(i = 0; i < installedVersions.count(); i++)
+    {
+        if(i == 0)
+        {
+            installed = installedVersions.at(0);
+        }
+        else
+        {
+            installed.append(QString(", %1").arg(installedVersions.at(i)));
+        }
+    }
+
+    for(i = 0; i < obsoletedVersions.count(); i++)
+    {
+        if(i == 0)
+        {
+            obsoleted = obsoletedVersions.at(0);
+        }
+        else
+        {
+            obsoleted.append(QString(", %1").arg(obsoletedVersions.at(i)));
+        }
+    }
+
+    if(installedVersions.isEmpty() && obsoletedVersions.isEmpty())
+    {
+        // no versions of this app have been installed
+        result.append(QString("<P><A HREF=\"app:%1\">%1</A><BR>").arg(app));
+    }
+    else
+    {
+        result.append(QString("<P><B><A HREF=\"app:%1\">%1-%2</A> (").arg(app).arg(latestVersion));
+
+        if(installedVersions.contains(latestVersion))
+        {
+            if(obsoletedVersions.isEmpty())
+            {
+                // latest version of app is installed, no obsoleted versions.
+                if(installedVersions.count() == 1)
+                {
+                    result.append(QString("installed)</B><BR>"));
+                }
+                else
+                {
+                    result.append(QString("installed %1)</B><BR>").arg(installed));
+                }
+            }
+            else
+            {
+                // latest version of app is installed, along with one or more obsoleted versions.
+                if(installedVersions.count() == 1)
+                {
+                    result.append(QString("installed, obsolete %1)</B><BR>").arg(obsoleted));
+                }
+                else
+                {
+                    result.append(QString("installed %1, obsolete %2)</B><BR>").arg(installed).arg(obsoleted));
+                }
+            }
+        }
+        else
+        {
+            if(installedVersions.isEmpty())
+            {
+                // only obsoleted version(s) are installed
+                result.append(QString("obsolete %1)</B><BR>").arg(obsoleted));
+            }
+            else
+            {
+                if(obsoletedVersions.isEmpty())
+                {
+                    // no obsoleted versions installed
+                    result.append(QString("installed %1)</B><BR>").arg(installed));
+                }
+                else
+                {
+                    // both supported and obsoleted versions installed
+                    result.append(QString("installed %1, obsolete %2)</B><BR>").arg(installed).arg(obsoleted));
+                }
+            }
+        }
+    }
+
+    if(description.isEmpty())
+    {
+        description = "(no description available)";
+    }
+    result.append(QString("%1</P>").arg(description));
 }
 
 void BrowserView::about()
@@ -1554,6 +1936,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.</P>
     {
         emit titleChanged(documentTitle());
     }
+    setFocus();
 }
 
 void BrowserView::reloadingDatabase()
@@ -1614,6 +1997,7 @@ void BrowserView::viewFile(QString fileName)
     {
         emit titleChanged(documentTitle());
     }
+    setFocus();
 }
 
 void BrowserView::error(QString text)
@@ -1634,4 +2018,6 @@ void BrowserView::error(QString text)
     {
         emit titleChanged(documentTitle());
     }
+
+    window->focusLineEdit();
 }

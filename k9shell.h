@@ -36,7 +36,6 @@ public slots:
 signals:
 
 protected:
-    class QTemporaryFile* tmp;
 
 };
 

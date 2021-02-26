@@ -22,5 +22,10 @@
         <file>img/sys.svg</file>
         <file>img/www.svg</file>
         <file>img/x11.svg</file>
+        <file>img/kde.svg</file>
+        <file>img/gnome.svg</file>
+        <file>img/xfce.svg</file>
+        <file>img/mail.svg</file>
+        <file>img/new.svg</file>
     </qresource>
 </RCC>

@@ -81,6 +81,38 @@ QString VersionString::cut(int index)
     return QString();
 }
 
+QString VersionString::cutNoRevision(int index)
+{
+    if(index >= 0 && index < components.count())
+    {
+        if(index == 0)
+        {
+            return components.at(index);
+        }
+
+        if(components.at(index - 1) != "r")
+        {
+            if(components.at(index) != "r")
+            {
+                return components.at(index);
+            }
+        }
+    }
+
+    return QString();
+}
+
+QString VersionString::revision()
+{
+    int i = pvr.indexOf("-r");
+    if(i >= 0)
+    {
+        return pvr.mid(i + 2);
+    }
+
+    return QString();
+}
+
 QString VersionString::pv()
 {
     int i = pvr.indexOf("-r");
@@ -102,6 +134,192 @@ QString VersionString::pr()
 
     return "r0";
 }
+
+QString VersionString::greaterThanEqualToSQL()
+{
+    QString s;
+    QString clauses;
+    int count = components.count();
+    for(int i = 0; i < count; i++)
+    {
+        s = components.at(i);
+        if(s == "r")
+        {
+            i++;
+            if(i >= count)
+            {
+                break;
+            }
+
+            s = components.at(i);
+            if(clauses.isEmpty() == false)
+            {
+                clauses.append(" and ");
+            }
+            clauses.append(QString("V6 >= %1").arg(escapeSql(s)));
+            break;
+        }
+
+        if(i < 6)
+        {
+            if(clauses.isEmpty() == false)
+            {
+                clauses.append(" and ");
+            }
+            clauses.append(QString("V%1 >= %2").arg(i + 1).arg(escapeSql(s)));
+        }
+    }
+
+    return clauses;
+}
+
+QString VersionString::lessThanEqualToSQL()
+{
+    QString s;
+    QString clauses;
+    int count = components.count();
+    for(int i = 0; i < count; i++)
+    {
+        s = components.at(i);
+        if(s == "r")
+        {
+            i++;
+            if(i >= count)
+            {
+                break;
+            }
+
+            s = components.at(i);
+            if(clauses.isEmpty() == false)
+            {
+                clauses.append(" and ");
+            }
+            clauses.append(QString("V6 <= %1").arg(escapeSql(s)));
+            break;
+        }
+
+        if(i < 6)
+        {
+            if(clauses.isEmpty() == false)
+            {
+                clauses.append(" and ");
+            }
+            clauses.append(QString("V%1 <= %2").arg(i + 1).arg(escapeSql(s)));
+        }
+    }
+
+    return clauses;
+}
+
+QString VersionString::greaterThanSQL()
+{
+    QString s;
+    QString clauses;
+    int count = components.count();
+    for(int i = 0; i < count; i++)
+    {
+        s = components.at(i);
+        if(s == "r")
+        {
+            i++;
+            if(i >= count)
+            {
+                break;
+            }
+
+            s = components.at(i);
+            if(clauses.isEmpty() == false)
+            {
+                clauses.append(" and ");
+            }
+            clauses.append(QString("V6 > %1").arg(escapeSql(s)));
+            break;
+        }
+
+        if(i < 6)
+        {
+            if(clauses.isEmpty() == false)
+            {
+                clauses.append(" and ");
+            }
+
+            if(i+1 < count && components.at(i+1) != "r")
+            {
+                clauses.append(QString("V%1 >= %2").arg(i + 1).arg(escapeSql(s)));
+            }
+            else
+            {
+                clauses.append(QString("V%1 > %2").arg(i + 1).arg(escapeSql(s)));
+            }
+        }
+    }
+
+    //qDebug() << "<" << pvr << "where" << clauses;
+    return clauses;
+}
+
+QString VersionString::lessThanSQL()
+{
+    QString s;
+    QString clauses;
+    int count = components.count();
+    for(int i = 0; i < count; i++)
+    {
+        s = components.at(i);
+        if(s == "r")
+        {
+            i++;
+            if(i >= count)
+            {
+                break;
+            }
+
+            s = components.at(i);
+            if(clauses.isEmpty() == false)
+            {
+                clauses.append(" and ");
+            }
+            clauses.append(QString("V6 < %1").arg(escapeSql(s)));
+            break;
+        }
+
+        if(i < 6)
+        {
+            if(clauses.isEmpty() == false)
+            {
+                clauses.append(" and ");
+            }
+
+            if(i+1 < count && components.at(i+1) != "r")
+            {
+                clauses.append(QString("V%1 <= %2").arg(i + 1).arg(escapeSql(s)));
+            }
+            else
+            {
+                clauses.append(QString("V%1 < %2").arg(i + 1).arg(escapeSql(s)));
+            }
+        }
+    }
+
+    //qDebug() << "<" << pvr << "where" << clauses;
+    return clauses;
+}
+
+QString VersionString::escapeSql(QString s)
+{
+    bool ok;
+    int i;
+    i = s.toInt(&ok);
+    if(ok)
+    {
+        return s;
+    }
+
+    s.replace("'", "''");
+    return QString("'%1'").arg(s);
+}
+
+
 
 /*
 See https://mgorny.pl/articles/the-ultimate-guide-to-eapi-7.html#version-manipulation-and-comparison-commands

@@ -21,12 +21,14 @@
 #include <QStringList>
 
 #include <QHash>
+#include <QVector>
 #include <QVariant>
 #include <QRegularExpression>
 #include <QIcon>
 #include <QPointF>
 
 class QLabel;
+class QProgressBar;
 class QMenu;
 class QContextMenuEvent;
 class QSqlQuery;
@@ -39,8 +41,14 @@ public:
 
     QMenu* createStandardContextMenu(const QPoint &position);
 
-    void appendHistory(QString text);
-    QStringList history;
+    void appendHistory(QString text, int scrollX, int scrollY);
+    struct History
+    {
+        QString target;
+        int scrollX;
+        int scrollY;
+    };
+    QVector<History> history;
     int currentHistory;
     QString url();
     QString title() const;
@@ -70,6 +78,7 @@ signals:
     void openInNewTab(const QString& url);
 
 public slots:
+    void setProgress(int progress);
     void setStatus(QString text);
     void navigateTo(QString text, bool changeHistory = true, bool feelingLucky = false);
     void setUrl(const QUrl& url);
@@ -85,6 +94,7 @@ public slots:
     void viewApp(const QUrl& url);
     void reloadApp(const QUrl& url);
     void searchApps(QString search, bool feelingLucky = false);
+    void whatsNew(QString search, bool feelingLucky = false);
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
@@ -92,16 +102,20 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
 
     virtual void contextMenuEvent(QContextMenuEvent *event) override;
+    virtual void resizeEvent(QResizeEvent* event);
 
-    QHash<QString, QString> iconMap;
+    QHash<QString, QString> iconMap;    // category type, icon resource file name
 
     QString delayUrl;
     QString delayTitle;
 
     QLabel* status;
+    QProgressBar* progress;
     QString context;
+    bool isWorld;
 
-    void printApp(QString& result, QHash<QString, QString>& installedVersions, QHash<QString, QString>& obsoletedVersions, QStringList& apps, QSqlQuery& query);
+    void showQueryResult(QSqlQuery* query, QString header, QString search, bool feelingLucky = false);
+    void printApp(QString& result, QString& app, QString& description, QString& latestVersion, QStringList& installedVersions, QStringList& obsoletedVersions);
 };
 
 #endif // BROWSERVIEW_H

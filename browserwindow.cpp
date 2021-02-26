@@ -506,11 +506,12 @@ void BrowserWindow::uninstall(QString atom)
     uninstallView->setText(cmd);
 }
 
-void BrowserWindow::openWindow()
+BrowserWindow* BrowserWindow::openWindow()
 {
     BrowserWindow *window = browser->createWindow();
     window->resize(width(), height());
     window->show();
+    return window;
 }
 
 void BrowserWindow::reloadDatabase()
