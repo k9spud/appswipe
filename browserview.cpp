@@ -574,6 +574,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     QString useFlags;
     QString cFlags;
     QString cxxFlags;
+    int firstUnmasked = -1;
 
     QHash<QString, QString> installedVersions;
     QString versionSize;
@@ -589,120 +590,139 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
         while(1)
         {
             installed = query.value(4).toBool();
-            if(installed)
+            if(installed == false)
             {
-                //determine icon file
-                category = query.value(11).toString();
-                package = query.value(12).toString();
-                version = query.value(2).toString();
-                iuse = query.value(10).toString();
-                appicon = QString("/var/db/pkg/%1/%2-%3/CONTENTS").arg(category).arg(package).arg(version);
-                QStringList bigIcons;
-                QStringList smallIcons;
-                QStringList desktopFiles;
-                input.setFileName(appicon);
-                if(input.open(QIODevice::ReadOnly))
+                if(firstUnmasked == -1)
                 {
-                    s = input.readAll();
-                    input.close();
-                    QStringList lines = s.split('\n');
-                    foreach(s, lines)
+                    keywords = query.value(9).toString();
+                    masked = query.value(13).toBool();
+                    if(masked == false && keywords.contains(portage->arch))
                     {
-                        s.remove('\n');
-                        s = s.trimmed();
-                        if(s.isEmpty() || s.startsWith('#'))
-                        {
-                            continue;
-                        }
-
-                        if(s.contains(".desktop "))
-                        {
-                            QStringList fields = s.split(' ');
-                            if(fields.count() >= 4 && fields.at(0) == "obj")
-                            {
-                                desktopFiles.append(fields.at(1));
-                            }
-                        }
-                        else if(s.contains("/usr/share/icons/") || s.contains("/usr/share/pixmaps/"))
-                        {
-                            QStringList fields = s.split(' ');
-                            if(fields.count() >= 4 && fields.at(0) == "obj")
-                            {
-                                if((s.contains("128x128") || s.endsWith(".svg")) && bigIcons.count() && (bigIcons.first().endsWith(".svg") == false))
-                                {
-                                    bigIcons.prepend(fields.at(1));
-                                }
-                                else
-                                {
-                                    bigIcons.append(fields.at(1));
-                                }
-
-                                if(s.contains("32x32") || s.endsWith(".svg"))
-                                {
-                                    smallIcons.prepend(fields.at(1));
-                                }
-                                else
-                                {
-                                    smallIcons.append(fields.at(1));
-                                }
-                            }
-                        }
+                        firstUnmasked = query.at();
                     }
+                }
 
-                    if(bigIcons.count())
+                if(query.next() == false)
+                {
+                    if(firstUnmasked != -1)
                     {
-                        appicon = bigIcons.first();
+                        query.seek(firstUnmasked);
                     }
                     else
                     {
-                        appicon.clear();
+                        query.first();
                     }
-
-                    if(smallIcons.count())
-                    {
-                        setIcon(smallIcons.first());
-                        hasIcon = true;
-                    }
+                    break;
                 }
-
-                s = QString("/var/db/pkg/%1/%2-%3/USE").arg(category).arg(package).arg(version);
-                input.setFileName(s);
-                if(input.open(QIODevice::ReadOnly))
-                {
-                    useFlags = input.readAll();
-                    input.close();
-                }
-
-                s = QString("/var/db/pkg/%1/%2-%3/IUSE").arg(category).arg(package).arg(version);
-                input.setFileName(s);
-                if(input.open(QIODevice::ReadOnly))
-                {
-                    iuse = input.readAll();
-                    input.close();
-                }
-
-                s = QString("/var/db/pkg/%1/%2-%3/CFLAGS").arg(category).arg(package).arg(version);
-                input.setFileName(s);
-                if(input.open(QIODevice::ReadOnly))
-                {
-                    cFlags = input.readAll();
-                    input.close();
-                }
-
-                s = QString("/var/db/pkg/%1/%2-%3/CXXFLAGS").arg(category).arg(package).arg(version);
-                input.setFileName(s);
-                if(input.open(QIODevice::ReadOnly))
-                {
-                    cxxFlags = input.readAll();
-                    input.close();
-                }
-                break;
+                continue;
             }
-            else if(query.next() == false)
+
+            //determine icon file
+            category = query.value(11).toString();
+            package = query.value(12).toString();
+            version = query.value(2).toString();
+            iuse = query.value(10).toString();
+            appicon = QString("/var/db/pkg/%1/%2-%3/CONTENTS").arg(category).arg(package).arg(version);
+            QStringList bigIcons;
+            QStringList smallIcons;
+            QStringList desktopFiles;
+            input.setFileName(appicon);
+            if(input.open(QIODevice::ReadOnly))
             {
-                query.first();
-                break;
+                s = input.readAll();
+                input.close();
+                QStringList lines = s.split('\n');
+                foreach(s, lines)
+                {
+                    s.remove('\n');
+                    s = s.trimmed();
+                    if(s.isEmpty() || s.startsWith('#'))
+                    {
+                        continue;
+                    }
+
+                    if(s.contains(".desktop "))
+                    {
+                        QStringList fields = s.split(' ');
+                        if(fields.count() >= 4 && fields.at(0) == "obj")
+                        {
+                            desktopFiles.append(fields.at(1));
+                        }
+                    }
+                    else if(s.contains("/usr/share/icons/") || s.contains("/usr/share/pixmaps/"))
+                    {
+                        QStringList fields = s.split(' ');
+                        if(fields.count() >= 4 && fields.at(0) == "obj")
+                        {
+                            if((s.contains("128x128") || s.endsWith(".svg")) && bigIcons.count() && (bigIcons.first().endsWith(".svg") == false))
+                            {
+                                bigIcons.prepend(fields.at(1));
+                            }
+                            else
+                            {
+                                bigIcons.append(fields.at(1));
+                            }
+
+                            if(s.contains("32x32") || s.endsWith(".svg"))
+                            {
+                                smallIcons.prepend(fields.at(1));
+                            }
+                            else
+                            {
+                                smallIcons.append(fields.at(1));
+                            }
+                        }
+                    }
+                }
+
+                if(bigIcons.count())
+                {
+                    appicon = bigIcons.first();
+                }
+                else
+                {
+                    appicon.clear();
+                }
+
+                if(smallIcons.count())
+                {
+                    setIcon(smallIcons.first());
+                    hasIcon = true;
+                }
             }
+
+            s = QString("/var/db/pkg/%1/%2-%3/USE").arg(category).arg(package).arg(version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                useFlags = input.readAll();
+                input.close();
+            }
+
+            s = QString("/var/db/pkg/%1/%2-%3/IUSE").arg(category).arg(package).arg(version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                iuse = input.readAll();
+                input.close();
+            }
+
+            s = QString("/var/db/pkg/%1/%2-%3/CFLAGS").arg(category).arg(package).arg(version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                cFlags = input.readAll();
+                input.close();
+            }
+
+            s = QString("/var/db/pkg/%1/%2-%3/CXXFLAGS").arg(category).arg(package).arg(version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                cxxFlags = input.readAll();
+                input.close();
+            }
+            break;
         }
 
         s = QString("/var/lib/portage/world");
@@ -817,7 +837,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                 ebuild = QString("/var/db/repos/%1/%2/%3/%3-%4.ebuild").arg(repo).arg(category).arg(package).arg(version);
             }
 
-            s = query.value(9).toString();
+            s = query.value(9).toString(); // PACKAGE.KEYWORD
             if(masked)
             {
                 s = "masked";
@@ -1228,14 +1248,14 @@ void BrowserView::searchApps(QString search, bool feelingLucky)
     QString glob = search.replace('*', "%");
     if(search.contains('/'))
     {
-        query.prepare("select c.CATEGORY, p.PACKAGE, p.VERSION, p.DESCRIPTION, p.INSTALLED, p.MASKED, p.OBSOLETED from PACKAGE p inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID where c.CATEGORY like ? and p.PACKAGE like ? order by c.CATEGORY, p.PACKAGE, p.MASKED, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 desc limit 10000");
+        query.prepare("select c.CATEGORY, p.PACKAGE, p.VERSION, p.DESCRIPTION, p.INSTALLED, p.MASKED, p.OBSOLETED, p.KEYWORDS from PACKAGE p inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID where c.CATEGORY like ? and p.PACKAGE like ? order by c.CATEGORY, p.PACKAGE, p.MASKED, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 desc limit 10000");
         QStringList x = glob.split('/');
         query.bindValue(0, "%" + x.first() + "%");
         query.bindValue(1, "%" + x.last() + "%");
     }
     else
     {
-        query.prepare("select c.CATEGORY, p.PACKAGE, p.VERSION, p.DESCRIPTION, p.INSTALLED, p.MASKED, p.OBSOLETED from PACKAGE p inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID where p.PACKAGE like ? or p.DESCRIPTION like ? or c.CATEGORY=? order by c.CATEGORY, p.PACKAGE, p.MASKED, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 desc limit 10000");
+        query.prepare("select c.CATEGORY, p.PACKAGE, p.VERSION, p.DESCRIPTION, p.INSTALLED, p.MASKED, p.OBSOLETED, p.KEYWORDS from PACKAGE p inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID where p.PACKAGE like ? or p.DESCRIPTION like ? or c.CATEGORY=? order by c.CATEGORY, p.PACKAGE, p.MASKED, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 desc limit 10000");
         query.bindValue(0, "%" + glob + "%");
         query.bindValue(1, "%" + glob + "%");
         query.bindValue(2, glob);
@@ -1270,7 +1290,7 @@ void BrowserView::whatsNew(QString search, bool feelingLucky)
     QSqlQuery query(db);
     QString glob = search.replace('*', "%");
     query.prepare(R"EOF(
-select c.CATEGORY, p.PACKAGE, p.VERSION, p.DESCRIPTION, p.INSTALLED, p.MASKED, p.OBSOLETED
+select c.CATEGORY, p.PACKAGE, p.VERSION, p.DESCRIPTION, p.INSTALLED, p.MASKED, p.OBSOLETED, p.KEYWORDS
 from PACKAGE p
 inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID
 where (p.PACKAGE, p.CATEGORYID) in (select p2.PACKAGE, p2.CATEGORYID from PACKAGE p2 where p2.PUBLISHED > ?)
@@ -1443,29 +1463,23 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             menu->addAction(action);
 
             action = new QAction("Verify integrity", this);
-            connect(action, &QAction::triggered, this, [this]()
+            connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                QUrl url(context);
-                QString app = url.path(QUrl::FullyDecoded);
-                shell->externalTerm(QString("qcheck =%1").arg(app));
+                shell->externalTerm(QString("qcheck =%1").arg(urlPath));
             });
             menu->addAction(action);
 
             action = new QAction("List files owned", this);
-            connect(action, &QAction::triggered, this, [this]()
+            connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                QUrl url(context);
-                QString app = url.path(QUrl::FullyDecoded);
-                shell->externalTerm(QString("qlist =%1 | less").arg(app));
+                shell->externalTerm(QString("qlist =%1 | less").arg(urlPath));
             });
             menu->addAction(action);
 
             action = new QAction("Who depends on this?", this);
-            connect(action, &QAction::triggered, this, [this]()
+            connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                QUrl url(context);
-                QString app = url.path(QUrl::FullyDecoded);
-                shell->externalTerm(QString("equery depends =%1").arg(app));
+                shell->externalTerm(QString("equery depends =%1").arg(urlPath));
             });
             menu->addAction(action);
 
@@ -1488,21 +1502,17 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             menu->addAction(action);
 
             action = new QAction("Reinstall", this);
-            connect(action, &QAction::triggered, this, [this]()
+            connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                QUrl url(context);
-                QString app = url.path(QUrl::FullyDecoded);
-                QString cmd = "sudo emerge =" + app + " --verbose --verbose-conflicts --nospinner --ask";
+                QString cmd = "sudo emerge =" + urlPath + " --verbose --verbose-conflicts --nospinner --ask";
                 shell->externalTerm(cmd);
             });
             menu->addAction(action);
 
             action = new QAction("Reinstall from source", this);
-            connect(action, &QAction::triggered, this, [this]()
+            connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                QUrl url(context);
-                QString app = url.path(QUrl::FullyDecoded);
-                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + app + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
+                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
                 shell->externalTerm(cmd);
             });
             menu->addAction(action);
@@ -1518,17 +1528,39 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             menu->addAction(action);
 
             action = new QAction("Install from source", this);
-            connect(action, &QAction::triggered, this, [this]()
+            connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                QUrl url(context);
-                QString app = url.path(QUrl::FullyDecoded);
-                QString cmd = "sudo emerge =" + app + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
+                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
+                shell->externalTerm(cmd);
+            });
+            menu->addAction(action);
+
+            action = new QAction("Fetch", this);
+            connect(action, &QAction::triggered, this, [this, urlPath]()
+            {
+                QString cmd = "sudo emerge =" + urlPath + " --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
+                shell->externalTerm(cmd);
+            });
+            menu->addAction(action);
+
+            action = new QAction("Fetch source", this);
+            connect(action, &QAction::triggered, this, [this, urlPath]()
+            {
+                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
                 shell->externalTerm(cmd);
             });
             menu->addAction(action);
         }
         else if(context.startsWith("app:"))
         {
+            action = new QAction("Copy atom to clipboard", this);
+            connect(action, &QAction::triggered, this, [this, urlPath]()
+            {
+                QClipboard* clip = qApp->clipboard();
+                clip->setText(urlPath);
+            });
+            menu->addAction(action);
+
             action = new QAction("Open link in new tab", this);
             connect(action, &QAction::triggered, this, [this]()
             {
@@ -1542,6 +1574,38 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             {
                 BrowserWindow* newWindow = window->openWindow();
                 newWindow->currentView()->navigateTo(context);
+            });
+            menu->addAction(action);
+
+            action = new QAction("Install", this);
+            connect(action, &QAction::triggered, this, [this, urlPath]()
+            {
+                QString cmd = "sudo emerge =" + urlPath + " --verbose --verbose-conflicts --nospinner --ask";
+                shell->externalTerm(cmd);
+            });
+            menu->addAction(action);
+
+            action = new QAction("Install from source", this);
+            connect(action, &QAction::triggered, this, [this, urlPath]()
+            {
+                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
+                shell->externalTerm(cmd);
+            });
+            menu->addAction(action);
+
+            action = new QAction("Fetch", this);
+            connect(action, &QAction::triggered, this, [this, urlPath]()
+            {
+                QString cmd = "sudo emerge =" + urlPath + " --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
+                shell->externalTerm(cmd);
+            });
+            menu->addAction(action);
+
+            action = new QAction("Fetch source", this);
+            connect(action, &QAction::triggered, this, [this, urlPath]()
+            {
+                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
+                shell->externalTerm(cmd);
             });
             menu->addAction(action);
         }
@@ -1571,6 +1635,18 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             {
                 QString cmd = "sudo emerge --noreplace " + urlPath + " --verbose --verbose-conflicts --nospinner --ask=n";
                 shell->externalTerm(cmd);
+                isWorld = true;
+            });
+            menu->addAction(action);
+        }
+        else
+        {
+            action = new QAction("Remove from @world set", this);
+            connect(action, &QAction::triggered, this, [this, urlPath]()
+            {
+                QString cmd = "sudo emerge --deselect " + urlPath + " --verbose --verbose-conflicts --nospinner --ask=n";
+                shell->externalTerm(cmd);
+                isWorld = false;
             });
             menu->addAction(action);
         }
@@ -1621,6 +1697,7 @@ void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString sear
     QString package;
     QString version;
     QString description;
+    QString keywords;
     int bestYet = -1;
     QString bestCategory;
     QString bestPackage;
@@ -1670,8 +1747,9 @@ void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString sear
         installed = (query->value(4).toInt() != 0);
         masked = (query->value(5).toInt() != 0);
         obsoleted = (query->value(6).toInt() != 0);
-
-        if(masked == false && latestUnmaskedVersion.isEmpty())
+        keywords = query->value(7).toString();
+        if(((masked == false && keywords.contains(portage->arch)) || installed) &&
+           latestUnmaskedVersion.isEmpty())
         {
             latestUnmaskedVersion = version;
         }
