@@ -7,7 +7,9 @@ Easily manage your system's applications from a point and click user interface
 rather than typing out long command lines for installing, uninstalling, and 
 upgrading apps.
 
-The program was written with Qt 5.15.2, ``dev-db/sqlite-3.35.5``, ``sys-apps/portage-3.0.28``, 
+![Screenshot](https://user-images.githubusercontent.com/39664841/139709601-35b9a8e7-e431-4631-98de-572ddafe5242.png)
+
+This program was written with Qt 5.15.2, ``dev-db/sqlite-3.35.5``, ``sys-apps/portage-3.0.28``, 
 ``app-portage/portage-utils-0.92``, ``xfce-base/exo-4.17.1``, and ``lxde-base/lxterminal-0.4.0``.
 
 What's New in v1.1.0?
