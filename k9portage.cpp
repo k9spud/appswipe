@@ -41,7 +41,40 @@ K9Portage::K9Portage(QObject *parent) : QObject(parent)
     dependSlotRE.setPattern("([^~=><].*)/([^:\\n]+):([^:\\n]+)");
     dependRepositoryRE.setPattern("(~|=|>=|>|<|<=)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*):([^:]*):([^:\\n]+)");
 
+    dependLinkRE.setPattern("(!~|!=|!>=|!<=|!>|!<|~|=|>=|>|<|<=|)(.+)/(.+)-([0-9\\*][^\\n]*)");
+    dependLinkSlotRE.setPattern("(.+)/(.+):([^\\n]+)");
+    dependLinkAppRE.setPattern("(!|)(.+)/([^\\[\\]\\n]+)(\\[[^\\n]+\\]|)");
+
+#if defined(__x86_64__)
+    arch = "amd64";
+#elif defined(__i386__)
+    arch = "x86";
+#elif defined(__aarch64__)
     arch = "arm64";
+#elif defined(__arm__)
+    arch = "arm";
+#elif defined(__mips__)
+    arch = "mips";
+#elif defined(__ppc64__)
+    arch = "ppc64";
+#elif defined(__powerpc__)
+    arch = "ppc";
+#elif defined(__sparc__)
+    arch = "sparc";
+#elif defined(__m68k__)
+    arch = "m68k";
+#elif defined(__alpha__)
+    arch = "alpha";
+#elif defined(__hppa__)
+    arch = "hppa";
+#elif defined(__ia64__)
+    arch = "ia64";
+#elif defined(__riscv__)
+    arch = "riscv";
+#elif defined(__s390__)
+    arch = "s390";
+#endif
+
 }
 
 void K9Portage::setRepoFolder(QString path)
@@ -584,6 +617,55 @@ void K9Portage::applyMasks(QSqlDatabase& db)
     }
 
     db.commit();
+}
+
+QString K9Portage::linkDependency(QString input)
+{
+    QRegularExpressionMatch match = dependLinkRE.match(input);
+    if(match.hasMatch())
+    {
+        QString filter = match.captured(1);
+        QString category = match.captured(2);
+        QString package = match.captured(3);
+        QString version = match.captured(4);
+        filter.replace("<", "&lt;");
+        filter.replace(">", "&gt;");
+        if(category.contains("*") == false && package.contains("*") == false)
+        {
+            return QString("%1<A HREF=\"app:%2/%3\">%2/%3</A>-%4").arg(filter).arg(category).arg(package).arg(version);
+        }
+    }
+
+    match = dependLinkSlotRE.match(input);
+    if(match.hasMatch())
+    {
+        QString category = match.captured(1);
+        QString package = match.captured(2);
+        QString slot = match.captured(3);
+        if(category.contains("*") == false && package.contains("*") == false)
+        {
+            return QString("<A HREF=\"app:%1/%2\">%1/%2</A>:%3").arg(category).arg(package).arg(slot);
+        }
+    }
+
+    match = dependLinkAppRE.match(input);
+    if(match.hasMatch())
+    {
+        QString filter = match.captured(1);
+        QString category = match.captured(2);
+        QString package = match.captured(3);
+        QString uses = match.captured(4);
+        filter.replace("<", "&lt;");
+        filter.replace(">", "&gt;");
+        if(category.contains("*") == false && package.contains("*") == false)
+        {
+            return QString("%1<A HREF=\"app:%2/%3\">%2/%3</A>%4").arg(filter).arg(category).arg(package).arg(uses);
+        }
+    }
+
+    input.replace("<", "&lt;");
+    input.replace(">", "&gt;");
+    return input;
 }
 
 QString K9Portage::equalFilter(QString& category, QString& package, QString& version)

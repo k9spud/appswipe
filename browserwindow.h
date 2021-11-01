@@ -52,7 +52,8 @@ public slots:
     void updateClipButton();
     void focusLineEdit();
     void exec(QString cmd);
-    void install(QString atom);
+    void exec(QString cmd, QString title);
+    void install(QString atom, bool isWorld);
     void uninstall(QString atom);
     BrowserWindow* openWindow();
     void reloadDatabase();

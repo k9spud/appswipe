@@ -26,6 +26,7 @@
 #include <QRegularExpression>
 #include <QIcon>
 #include <QPointF>
+#include <QTimer>
 
 class QLabel;
 class QProgressBar;
@@ -38,6 +39,8 @@ class BrowserView : public QTextEdit
     Q_OBJECT
 public:
     explicit BrowserView(QWidget *parent = nullptr);
+
+//    void dumpDocument(QTextFrame* frame, int indent = 0);
 
     QMenu* createStandardContextMenu(const QPoint &position);
 
@@ -68,6 +71,8 @@ public:
 
     BrowserWindow* window;
 
+    void resizeStatusBar();
+    
 signals:
     void urlChanged(const QUrl& url);
     void titleChanged(const QString& title);
@@ -96,10 +101,22 @@ public slots:
     void searchApps(QString search, bool feelingLucky = false);
     void whatsNew(QString search, bool feelingLucky = false);
 
+protected slots:
+    void swipeUpdate(void);
+
 protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+
+    bool scrollGrabbed;
+    bool swiping;
+    int oldScrollValue;
+    int oldY;
+    int dy;
+    QTimer animationTimer;
+
+    virtual void keyPressEvent(QKeyEvent *event);
 
     virtual void contextMenuEvent(QContextMenuEvent *event) override;
     virtual void resizeEvent(QResizeEvent* event);
@@ -116,6 +133,7 @@ protected:
 
     void showQueryResult(QSqlQuery* query, QString header, QString search, bool feelingLucky = false);
     void printApp(QString& result, QString& app, QString& description, QString& latestVersion, QStringList& installedVersions, QStringList& obsoletedVersions);
+    QString findAppIcon(bool& hasIcon, QString category, QString package, QString version);
 };
 
 #endif // BROWSERVIEW_H

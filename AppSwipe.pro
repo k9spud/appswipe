@@ -14,6 +14,7 @@ SOURCES += \
     browserwindow.cpp \
     datastorage.cpp \
     globals.cpp \
+    k9lineedit.cpp \
     k9portage.cpp \
     k9shell.cpp \
     k9tabbar.cpp \
@@ -28,6 +29,7 @@ HEADERS += \
     browserwindow.h \
     datastorage.h \
     globals.h \
+    k9lineedit.h \
     k9portage.h \
     k9shell.h \
     k9tabbar.h \

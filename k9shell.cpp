@@ -36,6 +36,11 @@ void K9Shell::externalBrowser(QString url)
 
 void K9Shell::externalTerm(QString cmd)
 {
+    externalTerm(cmd, cmd);
+}
+
+void K9Shell::externalTerm(QString cmd, QString title, bool waitSuccessful)
+{
     QTemporaryFile* tmp = new QTemporaryFile();
     if(tmp->open() == false)
     {
@@ -54,14 +59,37 @@ void K9Shell::externalTerm(QString cmd)
     out << cmd << "\n";
     if(cmd.endsWith("| less") == false)
     {
-        out << "read -rsn1 -p\"Press any key to close (exit code: $?)\n\";echo\n";
+        out << "RET_CODE=$?\n";
+        if(waitSuccessful == false)
+        {
+            out << "if [[ $RET_CODE -eq 0 ]];\n";
+            out << "then\n";
+            out << "  echo \"Success!\"\n";
+            out << "else\n";
+            out << "  echo \"Press 'q' to close (exit code: $RET_CODE)\"\n";
+            out << "  while true; do\n";
+            out << "    read -n1 -rs\n";
+            out << "    [[ $REPLY == 'q' || $REPLY == 'Q' ]] && break\n";
+            out << "  done\n";
+            out << "fi\n";
+        }
+        else
+        {
+            out << "echo \"Press 'q' to close (exit code: $RET_CODE)\"\n";
+            out << "while true; do\n";
+            out << "  read -n1 -rs\n";
+            out << "  [[ $REPLY == 'q' || $REPLY == 'Q' ]] && break\n";
+            out << "done\n";
+        }
     }
     out.flush();
     tmp->close();
 
     QStringList term;
-    term << "-T" << cmd << "-x" << "/bin/bash" << tmp->fileName();
-    startDetached("/usr/bin/xfce4-terminal", term);
+//    term << "-T" << cmd << "-x" << "/bin/bash" << tmp->fileName();
+//    startDetached("/usr/bin/xfce4-terminal", term);
+    term << "-T" << title << "-e" << "/bin/bash" << tmp->fileName();
+    startDetached("/usr/bin/lxterminal", term);
 }
 
 void K9Shell::externalFileManager(QString url)

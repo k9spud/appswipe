@@ -17,7 +17,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define APP_VERSION "1.0.31"
+#define APP_VERSION "1.1.0"
 #define APP_NAME "App Swipe v" APP_VERSION
 #define APP_COPYRIGHT "Copyright (c) 2021, K9spud LLC"
 #define APP_HTMLCOPYRIGHT "Copyright &copy; 2021, K9spud LLC"

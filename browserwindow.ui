@@ -17,38 +17,103 @@
    <string notr="true">color: rgb(255, 255, 240);
 font: 13pt &quot;Roboto&quot;;
 background-color: rgb(0, 0, 0);
-
 selection-color: rgb(255, 255, 240);
 selection-background-color: rgb(0, 100, 0)
 </string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="styleSheet">
-    <string notr="true"> QPushButton:pressed {
-     border: none 0px;
-     border-radius: 0px;
-	 background-color: #80000080;
- }
+    <string notr="true">
 /*QPushButton {
      border: none;
      border-radius: 0px;
 	 background-color: #00008080;
  }
-QPushButton:hover {
-     border: none;
-	 background-color: #00800040;
-}
 
-*/
-/*
  QPushButton:flat {
      border: none; 
  }
+
+ QPushButton:pressed {
+     border-radius: 0px;
+     border: 1px solid #808080;
+	 background-color: rgb(0, 20, 0,  80);
+ }*/
+/*
+QPushButton:hover {
+     border-radius: 5px;
+     border: none;
+	 background-color: rgba(0, 255, 0, 25);
+     border-top-left-radius: 5px;
+     border-top-right-radius: 5px;
+     border-bottom-left-radius: 5px;
+     border-bottom-right-radius: 5px;
+}
 */
+
+QWidget#toolbar {
+	color: rgb(255, 255, 240);
+	font: 16pt &quot;Roboto&quot;;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                  stop: 0.55 #000000, stop: 0.90 #004080, stop: 0.98 #1080A0,
+                                  stop: 0.99 #22A4D4, stop: 1.0 #33B5E5);
+	selection-color: rgb(255, 255, 240);
+	selection-background-color:  #007000;
+}
+
+QLineEdit {
+	background: #00000000;
+	font: 16pt;
+}
+
+/* vertical scroll bar **************************/
+QScrollBar:vertical
+{
+    background: #00000010;
+    width: 14px;
+    border: 0px solid #808080;
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+}
+
+QScrollBar::handle:vertical
+{
+/*    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:1 #2040E1, stop:0 #4080FF);*/
+	background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                  stop: 0.0 #33B5E5, stop: 0.01 #22A4D4, stop: 0.02 #1080A0, stop: 0.10 #004080, stop: 0.90 #004080, stop: 0.98 #1080A0,
+                                  stop: 0.99 #22A4D4, stop: 1.0 #33B5E5);
+
+    min-height: 40px;
+    border: 0px solid #32CCFF;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+    margin: 1px
+}
+
+/* this is the one line up button */
+QScrollBar::sub-line:vertical
+{
+    background: none;
+    width: 0px;
+    height: 0px;
+}
+
+/* this is the one line down button */
+QScrollBar::add-line:vertical
+{
+    background: none;
+    width: 0px;
+    height: 0px;
+}
 
 QMenu 
 {
 	background-color: #393939;
+/*	background: #393939;*/
 }
 
 QTabBar::tab
@@ -58,96 +123,50 @@ QTabBar::tab
 
 QTabBar::tab:selected 
 {
-	background-color: #151510; 
+	background-color: #101010; 
 }
 
-        /*********** horizontal scroll bar **********/
-        QScrollBar:horizontal
-        {
-            background: #00000000;
+/* horizontal scroll bar **********/
+QScrollBar:horizontal
+{
+    background: #00000000;
 
-            height: 16px;
+    height: 14px;
 
-            border: 1px solid #808080;
-            border-top-left-radius: 7px;
-            border-top-right-radius: 7px;
-            border-bottom-left-radius: 7px;
-            border-bottom-right-radius: 7px;
-        }
+    border: 0px solid #808080;
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+}
 
-        QScrollBar::handle:horizontal
-        {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:1 #2040E1, stop:0 #4080FF);
-            min-width: 45px;
-            border: 0px solid #32CCFF;
-            border-top-left-radius: 5px;
-            border-top-right-radius: 5px;
-            border-bottom-left-radius: 5px;
-            border-bottom-right-radius: 5px;
-            margin: 1px
-        }
+QScrollBar::handle:horizontal
+{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:1 #2040E1, stop:0 #4080FF);
+    min-width: 40px;
+    border: 0px solid #32CCFF;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+    margin: 1px
+}
 
-        /* this is the one line up button */
-        QScrollBar::sub-line:horizontal
-        {
-            background: none;
-            width: 0px;
-            height: 0px;
-        }
+/* this is the one line up button */
+QScrollBar::sub-line:horizontal
+{
+    background: none;
+    width: 0px;
+    height: 0px;
+}
 
-        /* this is the one line down button */
-        QScrollBar::add-line:horizontal
-        {
-            background: none;
-            width: 0px;
-            height: 0px;
-        }
-/* vertical scroll bar **************************/
-
-QScrollBar:vertical
-        {
-            background: #000000;
-/*            background: #A0EFEFFF;*/
-
-            width: 16px;
-
-            border: 1px solid #808080;
-            border-top-left-radius: 7px;
-            border-top-right-radius: 7px;
-            border-bottom-left-radius: 7px;
-            border-bottom-right-radius: 7px;
-        }
-
-        QScrollBar::handle:vertical
-        {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:1 #2040E1, stop:0 #4080FF);
-            min-height: 45px;
-            border: 0px solid #32CCFF;
-            border-top-left-radius: 5px;
-            border-top-right-radius: 5px;
-            border-bottom-left-radius: 5px;
-            border-bottom-right-radius: 5px;
-            margin: 1px
-        }
-
-        /* this is the one line up button */
-        QScrollBar::sub-line:vertical
-        {
-            background: none;
-            width: 0px;
-            height: 0px;
-        }
-
-        /* this is the one line down button */
-        QScrollBar::add-line:vertical
-        {
-            background: none;
-            width: 0px;
-            height: 0px;
-        }
-
-
-</string>
+/* this is the one line down button */
+QScrollBar::add-line:horizontal
+{
+    background: none;
+    width: 0px;
+    height: 0px;
+}</string>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout">
     <property name="spacing">
@@ -179,27 +198,6 @@ QScrollBar:vertical
         <height>45</height>
        </size>
       </property>
-      <property name="styleSheet">
-       <string notr="true">color: rgb(255, 255, 240);
-font: 16pt &quot;Roboto&quot;;
-background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                  stop: 0.55 #000000, stop: 0.90 #004080, stop: 0.98 #1080A0,
-                                  stop: 0.99 #22A4D4, stop: 1.0 #33B5E5);
-/*
-background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                  stop: 0.5 #000000, stop: 0.7 #004000, stop: 0.9 #008000,
-                                  stop: 0.99 #108010, stop: 1.0 #708070);
-*/
-/* rgb(0, 0, 0); */
-
-selection-color: rgb(255, 255, 240);
-/* selection-background-color:  qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                  stop: 0.2 #000000, stop: 0.8 #008000,
-                                  stop: 0.9 #108010, stop: 1.0 #708070); */
-selection-background-color:  #007000;
-/* rgb(0, 80, 0); */
-</string>
-      </property>
       <layout class="QHBoxLayout" name="horizontalLayout_3">
        <property name="spacing">
         <number>0</number>
@@ -223,6 +221,12 @@ selection-background-color:  #007000;
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>45</width>
+           <height>0</height>
+          </size>
          </property>
          <property name="toolTip">
           <string>Open new tab</string>
@@ -250,6 +254,12 @@ selection-background-color:  #007000;
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="minimumSize">
+          <size>
+           <width>45</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="toolTip">
           <string>Back</string>
          </property>
@@ -275,6 +285,12 @@ selection-background-color:  #007000;
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>45</width>
+           <height>0</height>
+          </size>
          </property>
          <property name="toolTip">
           <string>Forward</string>
@@ -302,6 +318,12 @@ selection-background-color:  #007000;
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="minimumSize">
+          <size>
+           <width>45</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="toolTip">
           <string>Refresh</string>
          </property>
@@ -321,7 +343,7 @@ selection-background-color:  #007000;
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="lineEdit">
+        <widget class="K9LineEdit" name="lineEdit">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
            <horstretch>0</horstretch>
@@ -330,6 +352,9 @@ selection-background-color:  #007000;
          </property>
          <property name="frame">
           <bool>false</bool>
+         </property>
+         <property name="placeholderText">
+          <string>Search for... (CTRL+L)</string>
          </property>
         </widget>
        </item>
@@ -340,6 +365,9 @@ selection-background-color:  #007000;
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">background-color: rgba(0, 0, 0, 0);</string>
          </property>
          <property name="value">
           <number>0</number>
@@ -353,6 +381,12 @@ selection-background-color:  #007000;
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>45</width>
+           <height>0</height>
+          </size>
          </property>
          <property name="toolTip">
           <string>Save to clipboard instead of executing</string>
@@ -380,6 +414,12 @@ selection-background-color:  #007000;
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="minimumSize">
+          <size>
+           <width>45</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="toolTip">
           <string>Ask before attempting system changes</string>
          </property>
@@ -406,6 +446,12 @@ selection-background-color:  #007000;
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="minimumSize">
+          <size>
+           <width>45</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="icon">
           <iconset resource="resources.qrc">
            <normaloff>:/img/appicon.svg</normaloff>:/img/appicon.svg</iconset>
@@ -426,9 +472,6 @@ selection-background-color:  #007000;
     </item>
     <item>
      <widget class="TabWidget" name="tabWidget">
-      <property name="styleSheet">
-       <string notr="true"/>
-      </property>
       <property name="tabPosition">
        <enum>QTabWidget::West</enum>
       </property>
@@ -464,6 +507,11 @@ selection-background-color:  #007000;
    <extends>QTabWidget</extends>
    <header>tabwidget.h</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>K9LineEdit</class>
+   <extends>QLineEdit</extends>
+   <header>k9lineedit.h</header>
   </customwidget>
  </customwidgets>
  <resources>

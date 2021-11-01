@@ -10,32 +10,44 @@ upgrading apps.
 The program was written with Qt 5.15.2, Sqlite 3.34.0, Portage 3.0.14, 
 Portage Utils 0.90.1, exo 4.16.0, and Xfce4 Terminal 0.8.10.
 
-What's New in v1.0.30?
+What's New in v1.1.0?
 ======================
 
-Viewing an application now shows more useful details, such as whether
-the app is a member of the @world set, what CFLAGS were used to build it,
-what the USE flags were, etc. 
+Now requires ``lxde-base/lxterminal`` instead of xfce4-terminal. Mainly
+because memory usage is lower and it seems just as functional.
 
-The list of package versions should be sorted a little better now. 
+Now should work correctly on architectures beyond arm64. I've tested
+it on AMD64, but many others should work fine too.
 
-Some support for displaying masked status has been implemented (may still 
-have some bugs/unsupported mask filters, and doesn't traverse repo profile 
-masks yet).
+Terminal windows now require pressing the specific key ``q`` before
+closing. Previously, any key would do, but that caused accidental window
+closes for me. Spawned terminal windows now display better titlebar text.
 
-Added new right click menu option for "Reinstall from Source," which will 
-force a rebuild of the selected package from source code rather than 
-reinstall from a previously built binary package. 
+Much improved app display. Now shows dependencies with clickable links
+so you can easily research the underlying required packages.
 
-Moving Forward and Back through history now retains the proper scroll 
-position.
+CTRL-SHIFT+C now copies selected text to the clipboard. This just makes for 
+less fussiness when copy and pasting to terminal windows, where CTRL-C 
+doesn't do clipboard operations. 
 
-Upgrading from Prior Releases
-=============================
+App Swipe now tries to avoid adding packages to the @world file when
+upgrading an existing installed package. Now it should only get added
+automatically if you're installing a new package.
 
-After compiling and starting this new version, you should hit the "Reload 
-Database" option from the top right menu (hit the apple with worm icon).
-Otherwise, you won't get all the mask/world, etc display improvements.
+Browser window has been improved to allow click and drag scrolling of the
+window from areas of whitespace. Allows supports kinetic scroll swiping.
+Bug with links failing to navigate when there exists selected text is
+fixed. Added a feature where the title line of the app can be clicked to
+copy the atom to the clipboard.
+
+Hamburger menu now pops up within the window instead of potentially going 
+off-screen if the app window is close to the edge of the screen.
+
+Added depclean action to the hamburger menu.
+
+Added "--newuse" option to emerge commandline whenever installing a
+package so that portage will pick up any new USE flags that might cause
+packages to need rebuilding.
 
 License
 =======

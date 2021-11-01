@@ -308,8 +308,7 @@ QString VersionString::lessThanSQL()
 QString VersionString::escapeSql(QString s)
 {
     bool ok;
-    int i;
-    i = s.toInt(&ok);
+    s.toInt(&ok);
     if(ok)
     {
         return s;

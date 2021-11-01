@@ -49,6 +49,7 @@ Browser::Browser(QObject *parent) : QObject(parent)
             windowId = qwindow.value(0).toInt();
             window = createWindow();
             window->setGeometry(qwindow.value(1).toInt(), qwindow.value(2).toInt(), qwindow.value(3).toInt(), qwindow.value(4).toInt());
+            //window->resize(qwindow.value(3).toInt(), qwindow.value(4).toInt());
 
             qry.bindValue(0, windowId);
             if(qry.exec())

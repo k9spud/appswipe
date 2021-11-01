@@ -14,30 +14,22 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-#ifndef K9SHELL_H
-#define K9SHELL_H
+#ifndef K9LINEEDIT_H
+#define K9LINEEDIT_H
 
-#include <QObject>
-#include <QProcess>
+#include <QLineEdit>
 
-extern class K9Shell* shell;
-
-class K9Shell : public QProcess
+class K9LineEdit : public QLineEdit
 {
     Q_OBJECT
 public:
-    explicit K9Shell(QObject *parent = nullptr);
+    explicit K9LineEdit(QWidget *parent = nullptr);
 
-public slots:
-    void externalBrowser(QString url);
-    void externalTerm(QString cmd);
-    void externalTerm(QString cmd, QString title, bool waitSuccessful = true);
-    void externalFileManager(QString url);
+protected:
+    virtual void keyPressEvent(QKeyEvent *event);
 
 signals:
 
-protected:
-
 };
 
-#endif // K9SHELL_H
+#endif // K9LINEEDIT_H

@@ -65,7 +65,13 @@ public:
     QRegularExpression dependSlotRE;
     QRegularExpression dependRepositoryRE;
 
+    QRegularExpression dependLinkRE;
+    QRegularExpression dependLinkSlotRE;
+    QRegularExpression dependLinkAppRE;
+
     void applyMasks(QSqlDatabase& db);
+
+    QString linkDependency(QString input);
 
 signals:
 

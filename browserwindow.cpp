@@ -196,7 +196,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     connect(action, &QAction::triggered, this, [this]()
     {
         QString cmd = "eselect news read";
-        shell->externalTerm(cmd);
+        shell->externalTerm(cmd, "News");
     });
     menu->addAction(action);
 
@@ -204,7 +204,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     connect(action, &QAction::triggered, this, [this]()
     {
         QString cmd = "glsa-check -l";
-        shell->externalTerm(cmd);
+        shell->externalTerm(cmd, "Security Advisories");
     });
     menu->addAction(action);
 
@@ -216,7 +216,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         {
             cmd.append(" --ask");
         }
-        exec(cmd);
+        exec(cmd, "Sync Repos");
     });
     menu->addAction(action);
 
@@ -228,7 +228,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     connect(action, &QAction::triggered, this, [this]()
     {
         QString cmd = "sudo emerge --update @world --fetchonly --newuse --deep --with-bdeps=y --nospinner ";
-        exec(cmd);
+        exec(cmd, "Fetch Used World");
     });
     menu->addAction(action);
 
@@ -236,7 +236,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     connect(action, &QAction::triggered, this, [this]()
     {
         QString cmd = "sudo emerge --update @world --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
-        exec(cmd);
+        exec(cmd, "Fetch All World");
     });
     menu->addAction(action);
 
@@ -248,7 +248,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         {
             cmd.append(" --ask");
         }
-        exec(cmd);
+        exec(cmd, "Update System");
     });
     menu->addAction(action);
 
@@ -260,7 +260,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         {
             cmd.append(" --ask");
         }
-        exec(cmd);
+        exec(cmd, "Update World");
     });
     menu->addAction(action);
 
@@ -268,9 +268,22 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     connect(action, &QAction::triggered, this, [this]()
     {
         QString cmd = "sudo dispatch-conf";
-        shell->externalTerm(cmd);
+        shell->externalTerm(cmd, "Dispatch Config Changes");
     });
     menu->addAction(action);
+
+    action = new QAction("Clean Unused Dependencies", this);
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        QString cmd = "sudo emerge --depclean --deep --with-bdeps=y --verbose --verbose-conflicts --nospinner";
+        if(ask)
+        {
+            cmd.append(" --ask");
+        }
+        exec(cmd, "Clean Unused Dependencies");
+    });
+    menu->addAction(action);
+
 
     action = new QAction("Exit", this);
     action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q));
@@ -337,8 +350,8 @@ void BrowserWindow::workFinished()
 void BrowserWindow::on_menuButton_pressed()
 {
     QPoint point = mapToGlobal(ui->menuButton->pos());
+    point.setX(point.x() - menu->sizeHint().width() + ui->menuButton->width());
     point.setY(point.y() + ui->menuButton->height());
-
     menu->exec(point);
 }
 
@@ -359,7 +372,10 @@ void BrowserWindow::on_reloadButton_clicked()
 
 void BrowserWindow::stop()
 {
-    rescan->abort = true;
+    if(rescan != nullptr)
+    {
+        rescan->abort = true;
+    }
     setWorking(false);
 }
 
@@ -450,7 +466,20 @@ void BrowserWindow::exec(QString cmd)
     }
 }
 
-void BrowserWindow::install(QString atom)
+void BrowserWindow::exec(QString cmd, QString title)
+{
+    if(clip)
+    {
+        QClipboard* clip = qApp->clipboard();
+        clip->setText(cmd);
+    }
+    else
+    {
+        shell->externalTerm(cmd, title);
+    }
+}
+
+void BrowserWindow::install(QString atom, bool isWorld)
 {
     if(clip == false)
     {
@@ -470,7 +499,12 @@ void BrowserWindow::install(QString atom)
     {
         cmd.append(QString(" =%1").arg(atom));
     }
-    cmd.append(" --verbose --verbose-conflicts --nospinner");
+    cmd.append(" --newuse --verbose --verbose-conflicts --nospinner");
+    if(isWorld == false)
+    {
+        cmd.append(" --oneshot");
+    }
+
     if(ask)
     {
         cmd.append(" --ask");

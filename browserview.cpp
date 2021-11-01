@@ -49,11 +49,22 @@
 #include <QVariant>
 #include <QScrollBar>
 #include <QTextDocument>
+#include <QTextFrame>
+#include <QTextFrameFormat>
+#include <QTextLength>
+#include <QAbstractTextDocumentLayout>
+#include <QBrush>
+#include <QTextCursor>
 #include <QProgressBar>
 #include <QResizeEvent>
 #include <QDateTime>
+#include <QClipboard>
+#include <QPushButton>
 
 #define PROGRESSBAR_HEIGHT 24
+#define START_SWIPE_THRESHOLD 20
+#define RELOAD_THRESHOLD 250
+#define LONGPRESS_MSECS_THRESHOLD 600
 
 BrowserView::BrowserView(QWidget *parent) : QTextEdit(parent)
 {
@@ -99,6 +110,10 @@ border-top-left-radius: 8px;
     iconMap["www"] = ":/img/www.svg";
     iconMap["x11"] = ":/img/x11.svg";
     iconMap["xfce"] = ":/img/xfce.svg";
+
+    scrollGrabbed = false;
+    swiping = false;
+    connect(&animationTimer, SIGNAL(timeout()), this, SLOT(swipeUpdate()));
 }
 
 QMenu* BrowserView::createStandardContextMenu(const QPoint& position)
@@ -305,31 +320,7 @@ void BrowserView::setStatus(QString text)
         }
 
         status->setText(text);
-        QFont font = status->font();
-        font = QFont("Roboto", 13);
-
-        QFontMetrics fm(font);
-        QRect rect = fm.boundingRect(text);
-        int maxWidth = width() - verticalScrollBar()->width();
-        int lineHeight = rect.height();
-        if(rect.width() > maxWidth)
-        {
-            rect.setHeight(lineHeight * (rect.width() / maxWidth + 1));
-            rect.setWidth(maxWidth);
-            rect = fm.boundingRect(rect, Qt::TextWordWrap, text);
-            status->setWordWrap(true);
-        }
-        else
-        {
-            status->setWordWrap(false);
-        }
-        int pad = 14;
-        int y = height() - rect.height();
-        status->setGeometry(0, y, rect.width() + pad, rect.height());
-        if(progress != nullptr)
-        {
-            progress->setGeometry(width() - 100, height() - PROGRESSBAR_HEIGHT, 100, PROGRESSBAR_HEIGHT);
-        }
+        resizeStatusBar();
         status->setVisible(true);
     }
 }
@@ -342,6 +333,14 @@ void BrowserView::navigateTo(QString text, bool changeHistory, bool feelingLucky
     }
     else
     {
+        if(text.startsWith("clip:"))
+        {
+           QClipboard* clip = qApp->clipboard();
+           clip->setText(text.mid(5));
+           setStatus(QString("'%1' copied to the clipboard.").arg(text.mid(5)));
+           return;
+        }
+
         if(changeHistory && !text.startsWith("install:") && !text.startsWith("uninstall:") && !text.startsWith("unmask:"))
         {
             int scrollX = 0, scrollY = 0;
@@ -390,18 +389,18 @@ void BrowserView::setUrl(const QUrl& url)
     else if(scheme == "install")
     {
         QString app = url.path(QUrl::FullyDecoded);
-        QString cmd = "sudo emerge =" + app + " --verbose --verbose-conflicts --nospinner";
+        QString cmd = "sudo emerge =" + app + " --newuse --verbose --verbose-conflicts --nospinner";
+        if(isWorld == false)
+        {
+            cmd.append(" --oneshot");
+        }
+
         if(window->ask)
         {
             cmd.append(" --ask");
         }
-        /*
-	QString logFile = app.mid(app.indexOf('/') + 1);
-        logFile.prepend(ds->storageFolder);
-        cmd.append(QString(" 2>&1 | tee %1.log").arg(logFile));
-*/
-        window->exec(cmd);
-        window->install(app);
+        window->exec(cmd, QString("%1 install").arg(app));
+        window->install(app, isWorld);
     }
     else if(scheme == "uninstall")
     {
@@ -411,7 +410,7 @@ void BrowserView::setUrl(const QUrl& url)
         {
             cmd.append(" --ask");
         }
-        window->exec(cmd);
+        window->exec(cmd, QString("%1 uninstall").arg(app));
         window->uninstall(app);
     }
     else if(scheme == "unmask")
@@ -427,7 +426,7 @@ void BrowserView::setUrl(const QUrl& url)
         {
             cmd.append(" --ask");
         }
-        window->exec(cmd);
+        window->exec(cmd, QString("%1 unmask").arg(app));
     }
     else if(scheme == "about")
     {
@@ -449,21 +448,12 @@ void BrowserView::setUrl(const QUrl& url)
 
 void BrowserView::back()
 {
-    qDebug() << "history:";
     QString s;
 
     History item;
     for(int i = 0; i < history.count(); i++)
     {
         item = history.at(i);
-        if(i == currentHistory)
-        {
-            qDebug() << "  " << item.target << item.scrollX << item.scrollY << "<-- you are here";
-        }
-        else
-        {
-            qDebug() << "  " << item.target << item.scrollX << item.scrollY;
-        }
     }
 
     if(currentHistory > 0)
@@ -485,8 +475,100 @@ void BrowserView::forward()
         delayScroll(item.scrollX, item.scrollY);
         navigateTo(item.target, false);
         emit urlChanged(item.target);
+        return;
     }
+/*
+    QTextDocument* doc = document();
+    QTextFrame* root = doc->rootFrame();
+    dumpDocument(root);*/
 }
+
+/*
+void BrowserView::dumpDocument(QTextFrame* frame, int indent)
+{
+    static int color;
+    if(indent == 0)
+    {
+        color = 0;
+    }
+    else
+    {
+        color++;
+    }
+
+    QString s = " ";
+    s = s.repeated(indent);
+    QTextFrameFormat ff = frame->frameFormat();
+    QBrush b(Qt::red);
+    switch(color)
+    {
+        case 0:
+            b.setColor(Qt::red);
+            break;
+        case 1:
+            b.setColor(Qt::green);
+            break;
+        case 2:
+            b.setColor(Qt::blue);
+            break;
+        case 3:
+            b.setColor(Qt::yellow);
+            break;
+        case 4:
+            b.setColor(Qt::magenta);
+            break;
+        case 5:
+            b.setColor(Qt::lightGray);
+            break;
+        default:
+            b.setColor(Qt::cyan);
+            break;
+    }
+
+    ff.setBorderBrush(b);
+    ff.setBorder(3);
+    ff.setBorderStyle(QTextFrameFormat::BorderStyle_Solid);
+    frame->setFrameFormat(ff);
+    qDebug() << QString("%8: %1 (%2 %3) h:%4 w:%5 p:%6 valid:%7").arg(s).arg(frame->firstPosition()).
+                arg(frame->lastPosition()).arg(ff.height().rawValue()).arg(ff.width().rawValue()).arg(ff.padding()).arg(ff.isValid()).arg(color);
+
+    indent += 2;
+    foreach(QTextFrame* child, frame->childFrames())
+    {
+        dumpDocument(child, indent);
+    }
+
+    QVector<QTextFormat> fmts = document()->allFormats();
+    int i = 0;
+    foreach(QTextFormat fmt, fmts)
+    {
+//        qDebug() << fmt.properties();
+        QMapIterator<int, QVariant> it(fmt.properties());
+        while(it.hasNext())
+        {
+             it.next();
+             qDebug() << QString("%3. %1 = %2").arg(it.key(), 0, 16).arg(it.value().toString()).arg(i);
+        }
+
+        i++;
+    }
+
+    //clear();
+
+    QWidget* vp = viewport();
+    QPushButton* btn = new QPushButton(vp);
+    btn->setGeometry(10, 10, 100, 100);
+    btn->setText("Hah Balh!");
+    btn->raise();
+    btn->setVisible(true);
+    if(vp->layout() == nullptr)
+    {
+        qDebug() << "no layout for viewport widget.";
+    }
+
+    update();
+}
+*/
 
 void BrowserView::reload(bool hardReload)
 {
@@ -574,6 +656,9 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     QString useFlags;
     QString cFlags;
     QString cxxFlags;
+    QString buildDepend;
+    QString runDepend;
+    QStringList runtimeDeps;
     int firstUnmasked = -1;
 
     QHash<QString, QString> installedVersions;
@@ -622,74 +707,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             package = query.value(12).toString();
             version = query.value(2).toString();
             iuse = query.value(10).toString();
-            appicon = QString("/var/db/pkg/%1/%2-%3/CONTENTS").arg(category).arg(package).arg(version);
-            QStringList bigIcons;
-            QStringList smallIcons;
-            QStringList desktopFiles;
-            input.setFileName(appicon);
-            if(input.open(QIODevice::ReadOnly))
-            {
-                s = input.readAll();
-                input.close();
-                QStringList lines = s.split('\n');
-                foreach(s, lines)
-                {
-                    s.remove('\n');
-                    s = s.trimmed();
-                    if(s.isEmpty() || s.startsWith('#'))
-                    {
-                        continue;
-                    }
-
-                    if(s.contains(".desktop "))
-                    {
-                        QStringList fields = s.split(' ');
-                        if(fields.count() >= 4 && fields.at(0) == "obj")
-                        {
-                            desktopFiles.append(fields.at(1));
-                        }
-                    }
-                    else if(s.contains("/usr/share/icons/") || s.contains("/usr/share/pixmaps/"))
-                    {
-                        QStringList fields = s.split(' ');
-                        if(fields.count() >= 4 && fields.at(0) == "obj")
-                        {
-                            if((s.contains("128x128") || s.endsWith(".svg")) && bigIcons.count() && (bigIcons.first().endsWith(".svg") == false))
-                            {
-                                bigIcons.prepend(fields.at(1));
-                            }
-                            else
-                            {
-                                bigIcons.append(fields.at(1));
-                            }
-
-                            if(s.contains("32x32") || s.endsWith(".svg"))
-                            {
-                                smallIcons.prepend(fields.at(1));
-                            }
-                            else
-                            {
-                                smallIcons.append(fields.at(1));
-                            }
-                        }
-                    }
-                }
-
-                if(bigIcons.count())
-                {
-                    appicon = bigIcons.first();
-                }
-                else
-                {
-                    appicon.clear();
-                }
-
-                if(smallIcons.count())
-                {
-                    setIcon(smallIcons.first());
-                    hasIcon = true;
-                }
-            }
+            appicon = findAppIcon(hasIcon, category, package, version);
 
             s = QString("/var/db/pkg/%1/%2-%3/USE").arg(category).arg(package).arg(version);
             input.setFileName(s);
@@ -722,6 +740,23 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                 cxxFlags = input.readAll();
                 input.close();
             }
+
+            s = QString("/var/db/pkg/%1/%2-%3/DEPEND").arg(category).arg(package).arg(version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                buildDepend = input.readAll();
+                input.close();
+            }
+
+            s = QString("/var/db/pkg/%1/%2-%3/RDEPEND").arg(category).arg(package).arg(version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                runDepend = input.readAll();
+                input.close();
+            }
+
             break;
         }
 
@@ -731,7 +766,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
         {
             QString worldSet = input.readAll();
             input.close();
-            if(worldSet.contains(search))
+            if(worldSet.contains(search + "\n"))
             {
                 isWorld = true;
             }
@@ -772,14 +807,14 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
 
         if(appicon.isEmpty())
         {
-            html.append(QString(R"EOF(<P><B>%1</B><BR>%2</P><P>%3</P>)EOF").arg(search).arg(description).arg(homePage));
+            html.append(QString(R"EOF(<P><B><A HREF="clip:%1">%1</A></B><BR>%2</P><P>%3</P>)EOF").arg(search).arg(description).arg(homePage));
         }
         else
         {
             html.append(QString(R"EOF(
 <TABLE>
 <TR><TD><IMG SRC="%4"></TD>
-<TD><P><BR><B>&nbsp;%1</B></P><P>&nbsp;%2</P><P>&nbsp;%3</P></TD></TR>
+<TD><P><BR><B>&nbsp;<A HREF="clip:%1">%1</A></B></P><P>&nbsp;%2</P><P>&nbsp;%3</P></TD></TR>
 </TABLE>
 )EOF").arg(search).arg(description).arg(homePage).arg(appicon));
         }
@@ -919,6 +954,62 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             html.append(QString("<P><B>CXXFLAGS:</B> %1</P>").arg(cxxFlags));
         }
 
+        if(runDepend.isEmpty() == false)
+        {
+            if(buildDepend == runDepend)
+            {
+                html.append("<P><B>Dependencies:</B></P><UL>");
+            }
+            else
+            {
+                html.append("<P><B>Depends upon these to run:</B></P><UL>");
+            }
+
+            runtimeDeps = runDepend.split(' ');
+            for(int i = 0; i < runtimeDeps.count(); i++)
+            {
+                s = portage->linkDependency(runtimeDeps.at(i));
+                if(i == 0)
+                {
+                    html.append(s);
+                }
+                else
+                {
+                    html.append(QString("<BR>\n%1").arg(s));
+                }
+            }
+
+            html.append("</UL>");
+        }
+
+        if(buildDepend.isEmpty() == false && runDepend != buildDepend)
+        {
+            QStringList deps = buildDepend.split(' ');
+            bool first = true;
+            for(int i = 0; i < deps.count(); i++)
+            {
+                s = deps.at(i);
+                if(runtimeDeps.contains(s) == false) // don't show build dependencies that were already listed in the runtime depenencies list
+                {
+                    if(first)
+                    {
+                        html.append("<P><B>Additional dependencies while building from source:</B></P><UL>");
+                        html.append(portage->linkDependency(s));
+                        first = false;
+                    }
+                    else
+                    {
+                        html.append(QString("<BR>\n%1").arg(portage->linkDependency(s)));
+                    }
+                }
+            }
+
+            if(first == false)
+            {
+                html.append("</UL>");
+            }
+        }
+
         if(keywords.isEmpty() == false)
         {
             html.append(QString("<P><B>Keywords:</B> %1</P>").arg(keywords));
@@ -1005,8 +1096,6 @@ values
     for(int repoId = 0; repoId < portage->repos.count(); repoId++)
     {
         categoryPath = portage->repos.at(repoId);
-        qDebug() << "Scanning repo:" << categoryPath;
-
         categoryPath.append(category);
 ///////////////////////////////////////////////////////// start of duplicate code in rescanthread.cpp
         buildsPath = categoryPath;
@@ -1108,7 +1197,6 @@ values
     QStringList packageNameFilter;
     packageNameFilter << QString("%1-*").arg(packageName);
 
-    qDebug() << "Scanning installed packages...";
     categoryPath = QString("/var/db/pkg/%1/").arg(category);
     dir.setPath(categoryPath);
     foreach(package, dir.entryList(packageNameFilter, QDir::Dirs | QDir::NoDotAndDotDot))
@@ -1219,7 +1307,6 @@ values
 
     db.commit();
     portage->applyMasks(db);
-    qDebug() << "Reload" << search << "completed.";
 }
 
 void BrowserView::searchApps(QString search, bool feelingLucky)
@@ -1305,12 +1392,74 @@ limit 10000;
     showQueryResult(&query, result, search, feelingLucky);
 }
 
+void BrowserView::swipeUpdate()
+{
+    int newScrollValue = oldScrollValue - dy / 2;
+    verticalScrollBar()->setValue(newScrollValue);
+    oldScrollValue = newScrollValue;
+
+    if(newScrollValue <= verticalScrollBar()->minimum() ||
+       newScrollValue >= verticalScrollBar()->maximum())
+    {
+        dy = 0;
+        animationTimer.stop();
+        return;
+    }
+
+    if(abs(dy) > 120)
+    {
+        dy += (dy > 0 ? -8:8);
+    }
+    else if(abs(dy) > 60)
+    {
+        dy += (dy > 0 ? -6:6);
+    }
+    else if(abs(dy) > 20)
+    {
+        dy += (dy > 0 ? -3:3);
+    }
+    else
+    {
+        dy += (dy > 0 ? -1:1);
+    }
+
+    if(dy == 0)
+    {
+        animationTimer.stop();
+    }
+    else
+    {
+        int delay = 100 / abs(dy);
+        if(delay < 16)
+        {
+            delay = 16; // 1 / 16ms = 60fps max animation speed
+        }
+        animationTimer.setInterval(delay);
+    }
+}
+
 
 void BrowserView::mousePressEvent(QMouseEvent* event)
 {
-    QString link;
-    link = anchorAt(event->pos());
+    if(event->button() == Qt::LeftButton)
+    {
+        animationTimer.stop(); // immediately stop swipe scrolling if user presses screen
+        QPointF p = event->pos();
+        p.setX(p.x() + horizontalScrollBar()->value());
+        p.setY(p.y() + verticalScrollBar()->value());
+        int hit = document()->documentLayout()->hitTest(p, Qt::ExactHit);
+        if(hit == -1)
+        {
+            scrollGrabbed = true;
+            oldY = event->globalY();
+            oldScrollValue = verticalScrollBar()->value();
+            return;
+        }
 
+        scrollGrabbed = false;
+    }
+
+    QString link = anchorAt(event->pos());
     if(link.isEmpty())
     {
         QTextEdit::mousePressEvent(event);
@@ -1321,25 +1470,66 @@ void BrowserView::mouseMoveEvent(QMouseEvent* event)
 {
     static QString oldLink;
 
-    QString link;
-    link = anchorAt(event->pos());
-
-    if(link.isEmpty())
+    if(scrollGrabbed)
     {
-        if(oldLink.isEmpty() == false)
+        dy = event->globalY() - oldY;
+        if(swiping == false)
         {
-            setStatus("");
-            oldLink.clear();
-            viewport()->unsetCursor();
+            if(abs(dy) < START_SWIPE_THRESHOLD)
+            {
+                return;
+            }
+
+            swiping = true;
+            viewport()->setCursor(Qt::ClosedHandCursor);
+        }
+
+        int newScrollValue = oldScrollValue - dy;
+        verticalScrollBar()->setValue(newScrollValue);
+        oldScrollValue = verticalScrollBar()->value();
+        if(newScrollValue != oldScrollValue)
+        {
+            // we've reached the end of the available scroll area
+            if(dy > RELOAD_THRESHOLD)
+            {
+                swiping = false;
+                oldY = event->globalY();
+            }
+        }
+        else
+        {
+            oldY = event->globalY();
+        }
+        return;
+    }
+
+    QPointF p = event->pos();
+    p.setX(p.x() + horizontalScrollBar()->value());
+    p.setY(p.y() + verticalScrollBar()->value());
+    int hit = document()->documentLayout()->hitTest(p, Qt::ExactHit);
+    if(hit == -1)
+    {
+        viewport()->setCursor(Qt::ArrowCursor);
+    }
+    else
+    {
+        QString link = anchorAt(event->pos());
+        if(link.isEmpty())
+        {
+            if(oldLink.isEmpty() == false)
+            {
+                setStatus("");
+                oldLink.clear();
+            }
+            viewport()->setCursor(Qt::IBeamCursor);
+        }
+        else if(link != oldLink)
+        {
+            setStatus(link);
+            oldLink = link;
+            viewport()->setCursor(Qt::PointingHandCursor);
         }
     }
-    else if(link != oldLink)
-    {
-        setStatus(link);
-        oldLink = link;
-        viewport()->setCursor(Qt::PointingHandCursor);
-    }
-
     QTextEdit::mouseMoveEvent(event);
 }
 
@@ -1360,15 +1550,44 @@ void BrowserView::mouseReleaseEvent(QMouseEvent* event)
             return;
 
         case Qt::LeftButton:
-            link = anchorAt(event->pos());
-            if(link.isEmpty() || textCursor().hasSelection())
+            if(scrollGrabbed)
             {
-                QTextEdit::mouseReleaseEvent(event);
-                return;
-            }
+                scrollGrabbed = false;
+                viewport()->unsetCursor();
+                event->accept();
 
-            navigateTo(link);
-            event->accept();
+                QTextCursor cur = textCursor();
+                if(swiping == false)
+                {
+                    if(cur.hasSelection())
+                    {
+                        cur.clearSelection();
+                        setTextCursor(cur);
+                    }
+                    QTextEdit::mouseReleaseEvent(event);
+                    return;
+                }
+
+                if(dy)
+                {
+                    dy = ((double)dy) * 3.5;
+                    animationTimer.setInterval(100 / abs(dy));
+                    animationTimer.start();
+                }
+                swiping = false;
+            }
+            else
+            {
+                link = anchorAt(event->pos());
+                if(link.isEmpty())
+                {
+                    QTextEdit::mouseReleaseEvent(event);
+                    return;
+                }
+
+                navigateTo(link);
+                event->accept();
+            }
             return;
 
         case Qt::MiddleButton:
@@ -1387,6 +1606,25 @@ void BrowserView::mouseReleaseEvent(QMouseEvent* event)
             QTextEdit::mouseReleaseEvent(event);
             return;
     }
+}
+
+void BrowserView::keyPressEvent(QKeyEvent* event)
+{
+    if(event->modifiers() == (Qt::ControlModifier + Qt::ShiftModifier))
+    {
+        switch(event->key())
+        {
+            case Qt::Key_C:
+                if(textCursor().hasSelection())
+                {
+                    QClipboard* clip = qApp->clipboard();
+                    clip->setText(textCursor().selectedText());
+                }
+                return;
+        }
+    }
+
+    QTextEdit::keyPressEvent(event);
 }
 
 void BrowserView::contextMenuEvent(QContextMenuEvent* event)
@@ -1465,21 +1703,21 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             action = new QAction("Verify integrity", this);
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                shell->externalTerm(QString("qcheck =%1").arg(urlPath));
+                shell->externalTerm(QString("qcheck =%1").arg(urlPath), QString("%1 integrity check").arg(urlPath));
             });
             menu->addAction(action);
 
             action = new QAction("List files owned", this);
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                shell->externalTerm(QString("qlist =%1 | less").arg(urlPath));
+                shell->externalTerm(QString("qlist =%1 | less").arg(urlPath), QString("%1 files").arg(urlPath));
             });
             menu->addAction(action);
 
             action = new QAction("Who depends on this?", this);
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                shell->externalTerm(QString("equery depends =%1").arg(urlPath));
+                shell->externalTerm(QString("equery depends =%1").arg(urlPath), QString("%1 needed by").arg(urlPath));
             });
             menu->addAction(action);
 
@@ -1488,7 +1726,7 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             {
                 QUrl url(context);
                 QString app = url.path(QUrl::FullyDecoded);
-                shell->externalTerm(QString("equery depgraph =%1  | less").arg(app));
+                shell->externalTerm(QString("equery depgraph =%1  | less").arg(app), QString("%1 dependencies graph").arg(app));
             });
             menu->addAction(action);
 
@@ -1497,7 +1735,7 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             {
                 QUrl url(context);
                 QString app = url.path(QUrl::FullyDecoded);
-                shell->externalTerm(QString("qsize =%1").arg(app));
+                shell->externalTerm(QString("qsize =%1").arg(app), QString("%1 size").arg(app));
             });
             menu->addAction(action);
 
@@ -1505,7 +1743,11 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
                 QString cmd = "sudo emerge =" + urlPath + " --verbose --verbose-conflicts --nospinner --ask";
-                shell->externalTerm(cmd);
+                if(isWorld == false)
+                {
+                    cmd.append(" --oneshot");
+                }
+                window->exec(cmd, QString("%1 reinstall").arg(urlPath));
             });
             menu->addAction(action);
 
@@ -1513,7 +1755,11 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
                 QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
-                shell->externalTerm(cmd);
+                if(isWorld == false)
+                {
+                    cmd.append(" --oneshot");
+                }
+                window->exec(cmd, QString("%1 reinstall from source").arg(urlPath));
             });
             menu->addAction(action);
         }
@@ -1531,7 +1777,11 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
                 QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
-                shell->externalTerm(cmd);
+                if(isWorld == false)
+                {
+                    cmd.append(" --oneshot");
+                }
+                window->exec(cmd, QString("%1 install from source").arg(urlPath));
             });
             menu->addAction(action);
 
@@ -1539,7 +1789,7 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
                 QString cmd = "sudo emerge =" + urlPath + " --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
-                shell->externalTerm(cmd);
+                window->exec(cmd, QString("%1 fetch").arg(urlPath));
             });
             menu->addAction(action);
 
@@ -1547,7 +1797,7 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
                 QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
-                shell->externalTerm(cmd);
+                window->exec(cmd, QString("%1 fetch source").arg(urlPath));
             });
             menu->addAction(action);
         }
@@ -1580,32 +1830,32 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             action = new QAction("Install", this);
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                QString cmd = "sudo emerge =" + urlPath + " --verbose --verbose-conflicts --nospinner --ask";
-                shell->externalTerm(cmd);
+                QString cmd = "sudo emerge " + urlPath + " --verbose --verbose-conflicts --nospinner --ask";
+                window->exec(cmd, QString("%1 install").arg(urlPath));
             });
             menu->addAction(action);
 
             action = new QAction("Install from source", this);
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
-                shell->externalTerm(cmd);
+                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge " + urlPath + " --usepkg=n --verbose --verbose-conflicts --nospinner --ask";
+                window->exec(cmd, QString("%1 install from source").arg(urlPath));
             });
             menu->addAction(action);
 
             action = new QAction("Fetch", this);
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                QString cmd = "sudo emerge =" + urlPath + " --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
-                shell->externalTerm(cmd);
+                QString cmd = "sudo emerge " + urlPath + " --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
+                window->exec(cmd, QString("%1 fetch").arg(urlPath));
             });
             menu->addAction(action);
 
             action = new QAction("Fetch source", this);
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
-                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
-                shell->externalTerm(cmd);
+                QString cmd = "sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge " + urlPath + " --usepkg=n --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
+                window->exec(cmd, QString("%1 fetch source").arg(urlPath));
             });
             menu->addAction(action);
         }
@@ -1634,7 +1884,7 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
                 QString cmd = "sudo emerge --noreplace " + urlPath + " --verbose --verbose-conflicts --nospinner --ask=n";
-                shell->externalTerm(cmd);
+                shell->externalTerm(cmd, QString("%1 add to @world").arg(urlPath), false);
                 isWorld = true;
             });
             menu->addAction(action);
@@ -1645,7 +1895,7 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             connect(action, &QAction::triggered, this, [this, urlPath]()
             {
                 QString cmd = "sudo emerge --deselect " + urlPath + " --verbose --verbose-conflicts --nospinner --ask=n";
-                shell->externalTerm(cmd);
+                shell->externalTerm(cmd, QString("%1 remove from @world").arg(urlPath), false);
                 isWorld = false;
             });
             menu->addAction(action);
@@ -1658,36 +1908,51 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
     }
 }
 
-void BrowserView::resizeEvent(QResizeEvent* event)
+void BrowserView::resizeStatusBar()
 {
-    QTextEdit::resizeEvent(event);
-
+    QString text = status->text();
     QFont font = status->font();
     font = QFont("Roboto", 13);
 
     QFontMetrics fm(font);
-    QRect rect = fm.boundingRect(status->text());
-    int maxWidth = width() - verticalScrollBar()->width();
+    QRect rect = fm.boundingRect(text);
+    int pad = 14;
+    int maxWidth = width() - verticalScrollBar()->width() - pad;
     int lineHeight = rect.height();
     if(rect.width() > maxWidth)
     {
-        //rect.setHeight(lineHeight * 4);
         rect.setHeight(lineHeight * (rect.width() / maxWidth + 1));
         rect.setWidth(maxWidth);
-        rect = fm.boundingRect(rect, Qt::TextWordWrap, status->text());
+        rect = fm.boundingRect(rect, Qt::TextWordWrap, text);
         status->setWordWrap(true);
     }
     else
     {
         status->setWordWrap(false);
     }
-    int pad = 14;
+    rect.setHeight(rect.height() + 5);
     int y = height() - rect.height();
+
+    QScrollBar *sb = horizontalScrollBar();
+    if(sb != nullptr)
+    {
+        if(sb->isVisible())
+        {
+            y -= sb->height();
+        }
+    }
+
     status->setGeometry(0, y, rect.width() + pad, rect.height());
     if(progress != nullptr)
     {
         progress->setGeometry(width() - 100, height() - PROGRESSBAR_HEIGHT, 100, PROGRESSBAR_HEIGHT);
     }
+}
+
+void BrowserView::resizeEvent(QResizeEvent* event)
+{
+    QTextEdit::resizeEvent(event);
+    resizeStatusBar();
 }
 
 void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString search, bool feelingLucky)
@@ -1975,6 +2240,82 @@ void BrowserView::printApp(QString& result, QString& app, QString& description, 
         description = "(no description available)";
     }
     result.append(QString("%1</P>").arg(description));
+}
+
+QString BrowserView::findAppIcon(bool& hasIcon, QString category, QString package, QString version)
+{
+    QFile input;
+    QStringList bigIcons;
+    QStringList smallIcons;
+    QStringList desktopFiles;
+    QString s;
+    QString appicon = QString("/var/db/pkg/%1/%2-%3/CONTENTS").arg(category).arg(package).arg(version);
+    input.setFileName(appicon);
+    if(input.open(QIODevice::ReadOnly))
+    {
+        s = input.readAll();
+        input.close();
+        QStringList lines = s.split('\n');
+        foreach(s, lines)
+        {
+            s.remove('\n');
+            s = s.trimmed();
+            if(s.isEmpty() || s.startsWith('#'))
+            {
+                continue;
+            }
+
+            if(s.contains(".desktop "))
+            {
+                QStringList fields = s.split(' ');
+                if(fields.count() >= 4 && fields.at(0) == "obj")
+                {
+                    desktopFiles.append(fields.at(1));
+                }
+            }
+            else if(s.contains("/usr/share/icons/") || s.contains("/usr/share/pixmaps/"))
+            {
+                QStringList fields = s.split(' ');
+                if(fields.count() >= 4 && fields.at(0) == "obj")
+                {
+                    if((s.contains("128x128") || s.endsWith(".svg")) && bigIcons.count() && (bigIcons.first().endsWith(".svg") == false))
+                    {
+                        bigIcons.prepend(fields.at(1));
+                    }
+                    else
+                    {
+                        bigIcons.append(fields.at(1));
+                    }
+
+                    if(s.contains("32x32") || s.endsWith(".svg"))
+                    {
+                        smallIcons.prepend(fields.at(1));
+                    }
+                    else
+                    {
+                        smallIcons.append(fields.at(1));
+                    }
+                }
+            }
+        }
+
+        if(bigIcons.count())
+        {
+            appicon = bigIcons.first();
+        }
+        else
+        {
+            appicon.clear();
+        }
+
+        if(smallIcons.count())
+        {
+            setIcon(smallIcons.first());
+            hasIcon = true;
+        }
+    }
+
+    return appicon;
 }
 
 void BrowserView::about()
