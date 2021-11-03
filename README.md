@@ -34,7 +34,7 @@ doesn't do clipboard operations.
 
 App Swipe now tries to avoid adding packages to the @world file when
 upgrading an existing installed package. Now it should only get added
-automatically if you're installing a new package.
+when you specifically designate it so.
 
 Browser window has been improved to allow click and drag scrolling of the
 window from areas of whitespace. Allows supports kinetic scroll swiping.
