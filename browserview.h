@@ -1,4 +1,4 @@
-// Copyright (c) 2021, K9spud LLC.
+// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -39,9 +39,6 @@ class BrowserView : public QTextEdit
     Q_OBJECT
 public:
     explicit BrowserView(QWidget *parent = nullptr);
-
-//    void dumpDocument(QTextFrame* frame, int indent = 0);
-
     QMenu* createStandardContextMenu(const QPoint &position);
 
     void appendHistory(QString text, int scrollX, int scrollY);
@@ -97,6 +94,7 @@ public slots:
     void reloadingDatabase();
     void viewFile(QString fileName);
     void viewApp(const QUrl& url);
+    void viewUpdates(QString action);
     void reloadApp(const QUrl& url);
     void searchApps(QString search, bool feelingLucky = false);
     void whatsNew(QString search, bool feelingLucky = false);
@@ -126,11 +124,14 @@ protected:
     QString delayUrl;
     QString delayTitle;
 
+    QString oldLink;
     QLabel* status;
     QProgressBar* progress;
     QString context;
     bool isWorld;
 
+    void fetchUpdates(QSqlQuery* query, QString search);
+    void showUpdates(QSqlQuery* query, QString header, QString search);
     void showQueryResult(QSqlQuery* query, QString header, QString search, bool feelingLucky = false);
     void printApp(QString& result, QString& app, QString& description, QString& latestVersion, QStringList& installedVersions, QStringList& obsoletedVersions);
     QString findAppIcon(bool& hasIcon, QString category, QString package, QString version);
