@@ -45,7 +45,7 @@ After that, use the following to install App Swipe:
 emerge app-portage/appswipe
 ```
 
-If all goes well, you can then run the `appswipe` program from your normal user-level account.
+If all went well, you can now run the `appswipe` program from your normal user-level account.
 
 What's New in v1.1.14?
 ======================
