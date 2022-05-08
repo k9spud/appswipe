@@ -22,6 +22,7 @@
 #include "tabwidget.h"
 #include "browserview.h"
 #include "datastorage.h"
+#include "k9shell.h"
 
 #include <QApplication>
 #include <QUrl>
@@ -42,35 +43,26 @@ int main(int argc, char *argv[])
     ds = new DataStorage();
     ds->openDatabase();
 
+    shell = new K9Shell();
+
     Browser browser;
+    BrowserWindow* window = nullptr;
     if(browser.windows.count() == 0)
     {
-        BrowserWindow* window = browser.createWindow();
+        window = browser.createWindow();
         window->show();
+    }
+    else
+    {
+        window = browser.windows.first();
+    }
+    if(window != nullptr)
+    {
         if(ds->emptyDatabase)
         {
             window->reloadDatabase();
             ds->emptyDatabase = false;
         }
-/*
-        bool startAbout = true;
-        QStringList args = QCoreApplication::arguments();
-        QString arg;
-        for(int i = 1; i < args.count(); i++)
-        {
-            arg = args.at(i);
-            if(arg.startsWith('-') == false)
-            {
-                window->currentView()->navigateTo(arg);
-                startAbout = false;
-                break;
-            }
-        }
-
-        if(startAbout)
-        {
-            window->currentView()->about();
-        }*/
     }
 
     return a.exec();
