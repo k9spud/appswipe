@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2021, K9spud LLC.
+﻿// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -58,6 +58,8 @@ public slots:
     BrowserWindow* openWindow();
     void reloadDatabase();
     void reloadDatabaseComplete();
+    void viewUpdates();
+    void switchToTab(int index);
 
 protected slots:
 

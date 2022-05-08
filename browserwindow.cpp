@@ -1,4 +1,4 @@
-// Copyright (c) 2021, K9spud LLC.
+// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -44,7 +44,6 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
 
     installView = nullptr;
     uninstallView = nullptr;
-    shell = new K9Shell(this);
     clip = false;
     ask = true;
     ui->tabWidget->window = this;
@@ -53,13 +52,111 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
     connect(action, &QAction::triggered, this, [this]()
     {
-        ui->lineEdit->setFocus(Qt::ShortcutFocusReason);
+        if(ui->lineEdit->hasFocus())
+        {
+            ui->lineEdit->selectAll();
+        }
+        else
+        {
+            ui->lineEdit->setFocus(Qt::ShortcutFocusReason);
+        }
+    });
+    addAction(action);
+
+    action = new QAction(this);
+    action->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Return));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        bool feelingLucky = true;
+        QString s = ui->lineEdit->text();
+        ui->tabWidget->currentView()->navigateTo(s, true, feelingLucky);
+        ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), ui->tabWidget->currentView()->icon());
     });
     addAction(action);
 
     action = new QAction("New &Tab", this);
     action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     connect(action, &QAction::triggered, this, &BrowserWindow::on_newTabButton_clicked);
+    addAction(action);
+
+    action = new QAction("Tab 1", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_1));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        switchToTab(1);
+    });
+    addAction(action);
+
+    action = new QAction("Tab 2", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_2));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        switchToTab(2);
+    });
+    addAction(action);
+
+    action = new QAction("Tab 3", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_3));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        switchToTab(3);
+    });
+    addAction(action);
+
+    action = new QAction("Tab 4", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_4));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        switchToTab(4);
+    });
+    addAction(action);
+
+    action = new QAction("Tab 5", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_5));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        switchToTab(5);
+    });
+    addAction(action);
+
+    action = new QAction("Tab 6", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_6));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        switchToTab(6);
+    });
+    addAction(action);
+
+    action = new QAction("Tab 7", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_7));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        switchToTab(7);
+    });
+    addAction(action);
+
+    action = new QAction("Tab 8", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_8));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        switchToTab(8);
+    });
+    addAction(action);
+
+    action = new QAction("Tab 9", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_9));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        switchToTab(9);
+    });
+    addAction(action);
+
+    action = new QAction("Last Tab", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        switchToTab(0);
+    });
     addAction(action);
 
     action = new QAction("&New Window", this);
@@ -192,6 +289,11 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     menu = new QMenu("App Menu", this);
     menu->setStyleSheet("background-color: #393939;");
 
+    action = new QAction(this);
+    action->setShortcut(QKeySequence(Qt::ALT | Qt::Key_F));
+    connect(action, &QAction::triggered, this, &BrowserWindow::on_menuButton_pressed);
+    addAction(action);
+
     action = new QAction("News", this);
     connect(action, &QAction::triggered, this, [this]()
     {
@@ -223,6 +325,12 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Reload Database", this);
     connect(action, &QAction::triggered, this, &BrowserWindow::reloadDatabase);
     menu->addAction(action);
+
+    action = new QAction("View Updates", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_QuoteLeft));
+    connect(action, &QAction::triggered, this, &BrowserWindow::viewUpdates);
+    menu->addAction(action);
+    addAction(action);
 
     action = new QAction("Fetch Used World", this);
     connect(action, &QAction::triggered, this, [this]()
@@ -572,6 +680,55 @@ void BrowserWindow::reloadDatabaseComplete()
 
     currentView()->reload(false);
     ui->lineEdit->setFocus();
+}
+
+void BrowserWindow::viewUpdates()
+{
+    QString s = "update:";
+    ui->lineEdit->setText(s);
+
+    BrowserView* view;
+    for(int i = 0; i < ui->tabWidget->count(); i++)
+    {
+        view = ui->tabWidget->tabView(i);
+        if(view->url() == s)
+        {
+            ui->tabWidget->setCurrentIndex(i);
+            ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), ui->tabWidget->currentView()->icon());
+            return;
+        }
+    }
+
+    // couldn't find an already open tab with available updates, so open a new tab instead:
+    ui->tabWidget->createTab();
+    ui->tabWidget->currentView()->navigateTo(s, true);
+    ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), ui->tabWidget->currentView()->icon());
+}
+
+void BrowserWindow::switchToTab(int index)
+{
+    if(ui->tabWidget->count() <= 0)
+    {
+        return;
+    }
+
+    if(index == 0)
+    {
+        // switch to last tab
+        ui->tabWidget->setCurrentIndex(ui->tabWidget->count() - 1);
+    }
+    else if(index <= ui->tabWidget->count())
+    {
+        ui->tabWidget->setCurrentIndex(index - 1);
+    }
+    else
+    {
+        return;
+    }
+
+    QString s = ui->tabWidget->currentView()->url();
+    ui->lineEdit->setText(s);
+    ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), ui->tabWidget->currentView()->icon());
 }
 
 void BrowserWindow::closeEvent(QCloseEvent* event)
