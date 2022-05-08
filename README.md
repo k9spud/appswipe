@@ -15,11 +15,37 @@ This program was written with Qt 5.15.3, ``dev-db/sqlite-3.38.2``, ``sys-apps/po
 Installation
 ============
 
-There is an ebuild for App Swipe now available in my `k9spud-overlay` repository. Follow the directions here (https://github.com/k9spud/k9spud-overlay) to set up the overlay on your system, then use the following to install App Swipe:
+There is an ebuild for App Swipe in my [k9spud-overlay](https://github.com/k9spud/k9spud-overlay). To add the k9spud-overlay to your system, do the following:
 
 ```console
-sudo emerge app-portage/appswipe
+sudo su -
+cd /var/db/repos
+git clone https://www.github.com/k9spud/k9spud-overlay.git k9spud
+nano -w /etc/portage/repos.conf/k9spud-overlay.conf
 ```
+
+Insert the following text into the k9spud-overlay.conf file:
+
+```console
+[k9spud]
+
+location = /var/db/repos/k9spud
+sync-type = git
+sync-uri = https://www.github.com/k9spud/k9spud-overlay.git
+priority = 200
+auto-sync = yes
+clone-depth = 1
+sync-depth = 1
+sync-gitclone-extra-opts = --single-branch --branch main
+```
+
+After that, use the following to install App Swipe:
+
+```console
+emerge app-portage/appswipe
+```
+
+If all goes well, you can then run the `appswipe` program from your normal user-level account.
 
 What's New in v1.1.14?
 ======================
@@ -72,45 +98,6 @@ Instead of showing the raw USE/IUSE flags, we now only display the IUSE flags
 that did not get used in the installed build. This makes it easier to find
 what USE flags you could be using, particularly for ebuilds that have a lot 
 of flags available.
-
-What's New in v1.1.0?
-======================
-
-Now requires ``lxde-base/lxterminal`` instead of xfce4-terminal. Mainly
-because memory usage is lower and it seems just as functional.
-
-Now should work correctly on architectures beyond arm64. I've tested
-it on AMD64, but many others should work fine too.
-
-Terminal windows now require pressing the specific key ``q`` before
-closing. Previously, any key would do, but that caused accidental window
-closes for me. Spawned terminal windows now display better titlebar text.
-
-Much improved app display. Now shows dependencies with clickable links
-so you can easily research the underlying required packages.
-
-CTRL-SHIFT+C now copies selected text to the clipboard. This just makes for 
-less fussiness when copy and pasting to terminal windows, where CTRL-C 
-doesn't do clipboard operations. 
-
-App Swipe now tries to avoid adding packages to the @world file when
-upgrading an existing installed package. Now it should only get added
-when you specifically designate it so.
-
-Browser window has been improved to allow click and drag scrolling of the
-window from areas of whitespace. Allows supports kinetic scroll swiping.
-Bug with links failing to navigate when there exists selected text is
-fixed. Added a feature where the title line of the app can be clicked to
-copy the atom to the clipboard.
-
-Hamburger menu now pops up within the window instead of potentially going 
-off-screen if the app window is close to the edge of the screen.
-
-Added depclean action to the hamburger menu.
-
-Added "--newuse" option to emerge commandline whenever installing a
-package so that portage will pick up any new USE flags that might cause
-packages to need rebuilding.
 
 License
 =======
