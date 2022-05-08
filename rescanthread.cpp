@@ -157,6 +157,9 @@ void RescanThread::run()
     QString packageName;
     int downloadSize = -1;
     qint64 published = 0;
+    qint64 status = K9Portage::UNKNOWN;
+    QString keywords;
+    QStringList keywordList;
     qint64 installed = 0;
     QDir builds;
     QFile input;
@@ -167,12 +170,12 @@ void RescanThread::run()
 insert into PACKAGE
 (
     CATEGORYID, REPOID, PACKAGE, DESCRIPTION, HOMEPAGE, VERSION, V1, V2, V3, V4, V5, V6, SLOT,
-    LICENSE, INSTALLED, OBSOLETED, DOWNLOADSIZE, KEYWORDS, IUSE, MASKED, PUBLISHED
+    LICENSE, INSTALLED, OBSOLETED, DOWNLOADSIZE, KEYWORDS, IUSE, MASKED, PUBLISHED, STATUS
 )
 values
 (
     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, 0, ?, ?, ?, 0, ?
+    ?, ?, 0, ?, ?, ?, 0, ?, ?
 )
 )EOF");
     query.prepare(sql);
@@ -245,6 +248,21 @@ values
 
                     portage->ebuildReader(buildsPath + "/" + ebuildFilePath);
 
+                    keywords = portage->var("KEYWORDS").toString();
+                    keywordList = keywords.split(' ');
+                    if(keywordList.contains(portage->arch))
+                    {
+                        status = K9Portage::STABLE;
+                    }
+                    else if(keywordList.contains(QString("~%1").arg(portage->arch)))
+                    {
+                        status = K9Portage::TESTING;
+                    }
+                    else
+                    {
+                        status = K9Portage::UNKNOWN;
+                    }
+
                     query.bindValue(0, categoryId);
                     query.bindValue(1, repoId);
                     query.bindValue(2, packageName);
@@ -261,9 +279,10 @@ values
                     query.bindValue(13, portage->var("LICENSE"));
                     query.bindValue(14, installed);
                     query.bindValue(15, downloadSize);
-                    query.bindValue(16, portage->var("KEYWORDS"));
+                    query.bindValue(16, keywords);
                     query.bindValue(17, portage->var("IUSE"));
                     query.bindValue(18, published);
+                    query.bindValue(19, status);
                     if(query.exec() == false)
                     {
                         qDebug() << "Query failed:" << query.executedQuery() << query.lastError().text();
@@ -283,12 +302,12 @@ values
 insert into PACKAGE
 (
     CATEGORYID, REPOID, PACKAGE, DESCRIPTION, HOMEPAGE, VERSION, V1, V2, V3, V4, V5, V6,
-    SLOT, LICENSE, INSTALLED, OBSOLETED, DOWNLOADSIZE, KEYWORDS, IUSE, MASKED, PUBLISHED
+    SLOT, LICENSE, INSTALLED, OBSOLETED, DOWNLOADSIZE, KEYWORDS, IUSE, MASKED, PUBLISHED, STATUS
 )
 values
 (
     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?, 0, ?
+    ?, ?, ?, ?, ?, ?, ?, 0, ?, ?
 )
 )EOF");
 
@@ -382,6 +401,21 @@ values
 
                 portage->ebuildReader(ebuildFilePath);
 
+                keywords = portage->var("KEYWORDS").toString();
+                keywordList = keywords.split(' ');
+                if(keywordList.contains(portage->arch))
+                {
+                    status = K9Portage::STABLE;
+                }
+                else if(keywordList.contains(QString("~%1").arg(portage->arch)))
+                {
+                    status = K9Portage::TESTING;
+                }
+                else
+                {
+                    status = K9Portage::UNKNOWN;
+                }
+
                 query.bindValue(0, categoryId);
                 if(repoId == -1)
                 {
@@ -406,9 +440,10 @@ values
                 query.bindValue(14, installed);
                 query.bindValue(15, obsolete);
                 query.bindValue(16, downloadSize);
-                query.bindValue(17, portage->var("KEYWORDS"));
+                query.bindValue(17, keywords);
                 query.bindValue(18, portage->var("IUSE"));
                 query.bindValue(19, published);
+                query.bindValue(20, status);
                 if(query.exec() == false)
                 {
                     qDebug() << "Query failed:" << query.executedQuery() << query.lastError().text();
