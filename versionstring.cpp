@@ -135,10 +135,9 @@ QString VersionString::pr()
     return "r0";
 }
 
-QString VersionString::greaterThanEqualToSQL()
+void VersionString::greaterThanEqualToSQL(QString& clauses)
 {
     QString s;
-    QString clauses;
     int count = components.count();
     for(int i = 0; i < count; i++)
     {
@@ -169,14 +168,11 @@ QString VersionString::greaterThanEqualToSQL()
             clauses.append(QString("V%1 >= %2").arg(i + 1).arg(escapeSql(s)));
         }
     }
-
-    return clauses;
 }
 
-QString VersionString::lessThanEqualToSQL()
+void VersionString::lessThanEqualToSQL(QString& clauses)
 {
     QString s;
-    QString clauses;
     int count = components.count();
     for(int i = 0; i < count; i++)
     {
@@ -207,14 +203,11 @@ QString VersionString::lessThanEqualToSQL()
             clauses.append(QString("V%1 <= %2").arg(i + 1).arg(escapeSql(s)));
         }
     }
-
-    return clauses;
 }
 
-QString VersionString::greaterThanSQL()
+void  VersionString::greaterThanSQL(QString& clauses)
 {
     QString s;
-    QString clauses;
     int count = components.count();
     for(int i = 0; i < count; i++)
     {
@@ -253,15 +246,11 @@ QString VersionString::greaterThanSQL()
             }
         }
     }
-
-    //qDebug() << "<" << pvr << "where" << clauses;
-    return clauses;
 }
 
-QString VersionString::lessThanSQL()
+void VersionString::lessThanSQL(QString& clauses)
 {
     QString s;
-    QString clauses;
     int count = components.count();
     for(int i = 0; i < count; i++)
     {
@@ -300,9 +289,6 @@ QString VersionString::lessThanSQL()
             }
         }
     }
-
-    //qDebug() << "<" << pvr << "where" << clauses;
-    return clauses;
 }
 
 QString VersionString::escapeSql(QString s)

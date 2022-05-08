@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2021, K9spud LLC.
+﻿// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -41,10 +41,10 @@ public:
     // Package revision, or r0 if no revision exists.
     QString pr();
 
-    QString greaterThanEqualToSQL();
-    QString lessThanEqualToSQL();
-    QString greaterThanSQL();
-    QString lessThanSQL();
+    void greaterThanEqualToSQL(QString& clauses);
+    void lessThanEqualToSQL(QString& clauses);
+    void greaterThanSQL(QString& clauses);
+    void lessThanSQL(QString& clauses);
 
     QVector<QString> components;
     QVector<QString> separators;
