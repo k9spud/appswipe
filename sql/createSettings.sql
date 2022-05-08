@@ -18,7 +18,7 @@ create table if not exists META (
     SCHEMAVERSION integer,
     UUID text
 );
-insert into META(SCHEMAVERSION) SELECT 1 WHERE NOT EXISTS(SELECT 0 FROM META);
+insert into META(SCHEMAVERSION) SELECT 2 WHERE NOT EXISTS(SELECT 0 FROM META);
 
 create table if not exists WINDOW (
     WINDOWID integer primary key,
@@ -73,5 +73,6 @@ create table if not exists PACKAGE (
     DOWNLOADSIZE integer,
     KEYWORDS text,
     IUSE text,
-    PUBLISHED integer
+    PUBLISHED integer,
+    STATUS integer
 );
