@@ -12,6 +12,15 @@ upgrading apps.
 This program was written with Qt 5.15.3, ``dev-db/sqlite-3.38.2``, ``sys-apps/portage-3.0.30-r3``, 
 ``app-portage/portage-utils-0.93.3``, ``xfce-base/exo-4.17.1``, and ``lxde-base/lxterminal-0.4.0``.
 
+Installation
+============
+
+There is an ebuild for App Swipe now available in my `k9spud-overlay` repository. Follow the directions here (https://github.com/k9spud/k9spud-overlay) to set up the overlay on your system, then use the following to install App Swipe:
+
+```console
+sudo emerge app-portage/appswipe
+```
+
 What's New in v1.1.14?
 ======================
 
