@@ -20,7 +20,7 @@
 #include <QTextStream>
 #include <QDebug>
 
-class K9Shell* shell = nullptr;
+K9Shell* shell = nullptr;
 
 K9Shell::K9Shell(QObject *parent) : QProcess(parent)
 {
