@@ -59,6 +59,11 @@ Added ALT-F keyboard shortcut for opening the app menu.
 Opening a new tab now pops up under the currently shown tab instead of adding
 itself all the way down at the end of all the existing tabs.
 
+Instead of showing the raw USE/IUSE flags, we now only display the IUSE flags
+that did not get used in the installed build. This makes it easier to find
+what USE flags you could be using, particularly for ebuilds that have a lot 
+of flags available.
+
 What's New in v1.1.0?
 ======================
 

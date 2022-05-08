@@ -860,12 +860,38 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
 
         if(useFlags.isEmpty() == false)
         {
-            html.append(QString("<P><B>USE:</B> %1</P>").arg(useFlags));
+            html.append(QString("<P><B>Applied Flags:</B> %1</P>").arg(useFlags));
         }
 
         if(iuse.isEmpty() == false)
         {
-            html.append(QString("<P><B>IUSE:</B> %1</P>").arg(iuse));
+            QStringList useList = useFlags.remove("\n").split(' ');
+            QStringList iuseList = iuse.remove("\n").split(' ');
+            qDebug() << "useList:" << useList;
+
+            QString s;
+            for(int i = 0; i < useList.count(); i++)
+            {
+                s = useList.at(i);
+                if(iuseList.contains(s))
+                {
+                    iuseList.removeAll(s);
+                }
+
+                s.prepend('+');
+                if(iuseList.contains(s))
+                {
+                    iuseList.removeAll(s);
+                }
+            }
+
+            iuseList.removeAll("");
+
+            if(iuseList.isEmpty() == false)
+            {
+                qDebug() << "iuseList:" << iuseList;
+                html.append(QString("<P><B>Unused Flags:</B> %1</P>").arg(iuseList.join(' ')));
+            }
         }
 
         if(cFlags.isEmpty() == false)
