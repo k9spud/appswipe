@@ -110,21 +110,24 @@ void TabWidget::setTabIcon(int index, const QIcon& icon)
 
 BrowserView* TabWidget::createTab()
 {
-    BrowserView* view = createBackgroundTab();
+    int insertAfter = currentIndex();
+    BrowserView* view = createBackgroundTab(insertAfter);
     setCurrentWidget(view);
     return view;
 }
 
 void TabWidget::openInNewTab(const QString& url)
 {
-    BrowserView* view = createBackgroundTab();
+    int insertAfter = currentIndex();
+
+    BrowserView* view = createBackgroundTab(insertAfter);
     if(url.isEmpty() == false)
     {
         view->navigateTo(url);
     }
 }
 
-BrowserView* TabWidget::createBackgroundTab()
+BrowserView* TabWidget::createBackgroundTab(int insertAfter)
 {
     BrowserView* view = new BrowserView();
     view->window = window;
@@ -158,7 +161,15 @@ BrowserView* TabWidget::createBackgroundTab()
         }
     });
 
-    int index = addTab(view, "");
+    int index;
+    if(insertAfter != -1)
+    {
+        index = insertTab(insertAfter + 1, view, "");
+    }
+    else
+    {
+        index = addTab(view, "");
+    }
     setTabIcon(index, view->icon());
 
     connect(view, &BrowserView::iconChanged, [this, view](QIcon icon)

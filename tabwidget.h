@@ -1,4 +1,4 @@
-// Copyright (c) 2021, K9spud LLC.
+// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -39,7 +39,7 @@ public:
 
 public slots:
     BrowserView* createTab();
-    BrowserView* createBackgroundTab();
+    BrowserView* createBackgroundTab(int insertAfter = -1);
     void openInNewTab(const QString& url);
     void closeTab(int index);
     void closeAll();
