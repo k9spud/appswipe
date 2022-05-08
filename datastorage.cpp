@@ -183,9 +183,9 @@ QString DataStorage::openDatabase()
             schemaVersion = query.value(0).toInt();
         }
 
-        if(schemaVersion < 1)
+        if(schemaVersion < 2)
         {
-            upgradeDatabase(db, schemaVersion);
+            upgradeDatabase(query, db, schemaVersion);
         }
     }
 
@@ -209,7 +209,7 @@ void DataStorage::createDatabase(QString connectionName, QString databaseFileNam
     }
 }
 
-bool DataStorage::upgradeDatabase(QSqlDatabase& db, int schemaVersion)
+bool DataStorage::upgradeDatabase(QSqlQuery& query, QSqlDatabase& db, int schemaVersion)
 {
     if(db.isValid() == false)
     {
@@ -217,9 +217,19 @@ bool DataStorage::upgradeDatabase(QSqlDatabase& db, int schemaVersion)
         return false;
     }
 
-    QSqlQuery query(db);
-
     db.transaction();
+
+    if(schemaVersion < 2)
+    {
+        if(query.exec("drop table PACKAGE") == false)
+        {
+            qDebug() << "Couldn't drop PACKAGE to perform upgrade from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+        emptyDatabase = true;
+    }
+
     if(runSqlScript(db, ":/sql/createSettings.sql") == false)
     {
         qDebug() << "createSettings.sql script failed during upgrade from schemaVersion" << schemaVersion << connectionName;
@@ -227,7 +237,7 @@ bool DataStorage::upgradeDatabase(QSqlDatabase& db, int schemaVersion)
         return false;
     }
 
-    int finalVersion = 7;
+    int finalVersion = 2;
     query.prepare("update META set UUID=ifnull(UUID,?), SCHEMAVERSION=?");
     query.bindValue(0, QUuid::createUuid().toString(QUuid::WithoutBraces));
     query.bindValue(1, finalVersion);
