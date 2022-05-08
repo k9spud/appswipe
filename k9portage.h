@@ -1,4 +1,4 @@
-// Copyright (c) 2021, K9spud LLC.
+// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -69,15 +69,24 @@ public:
     QRegularExpression dependLinkSlotRE;
     QRegularExpression dependLinkAppRE;
 
-    void applyMasks(QSqlDatabase& db);
-
     QString linkDependency(QString input);
+
+    void applyMasks(QSqlDatabase& db);
+    void readMaskFile(QString fileName, QSqlQuery& query);
+    
+    enum PackageStatus
+    {
+        UNKNOWN = 0,
+        TESTING,
+        STABLE
+    };
 
 signals:
 
 
 protected:
     QString equalFilter(QString& category,QString& package, QString& version);
+    QString anyRevisionFilter(QString& category,QString& package, QString& version);
     QString comparisonFilter(QString& filter, QString& category, QString& package, QString& version);
 };
 
