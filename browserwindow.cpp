@@ -24,6 +24,7 @@
 #include "browser.h"
 #include "browserview.h"
 #include "tabwidget.h"
+#include "k9tabbar.h"
 #include "k9shell.h"
 
 #include <QStringList>
@@ -35,6 +36,7 @@
 #include <QClipboard>
 #include <QInputDialog>
 #include <QCloseEvent>
+#include <QMessageBox>
 
 BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::BrowserWindow)
 {
@@ -281,6 +283,8 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         ui->lineEdit->setText(s);
     });
 
+    connect(ui->tabWidget, &TabWidget::enabledChanged, this, &BrowserWindow::handleEnabledChanged);
+
     action = new QAction(tr("&Stop"), this);
     action->setShortcut(QKeySequence(Qt::Key_Escape));
     connect(action, &QAction::triggered, this, &BrowserWindow::stop);
@@ -295,7 +299,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     addAction(action);
 
     action = new QAction("News", this);
-    connect(action, &QAction::triggered, this, [this]()
+    connect(action, &QAction::triggered, this, []()
     {
         QString cmd = "eselect news read";
         shell->externalTerm(cmd, "News");
@@ -303,7 +307,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     menu->addAction(action);
 
     action = new QAction("Security Advisories", this);
-    connect(action, &QAction::triggered, this, [this]()
+    connect(action, &QAction::triggered, this, []()
     {
         QString cmd = "glsa-check -l";
         shell->externalTerm(cmd, "Security Advisories");
@@ -318,6 +322,8 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         {
             cmd.append(" --ask");
         }
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(qApp->applicationFilePath()).arg(qApp->applicationPid()));
+
         exec(cmd, "Sync Repos");
     });
     menu->addAction(action);
@@ -373,7 +379,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     menu->addAction(action);
 
     action = new QAction("Dispatch Config Changes", this);
-    connect(action, &QAction::triggered, this, [this]()
+    connect(action, &QAction::triggered, this, []()
     {
         QString cmd = "sudo dispatch-conf";
         shell->externalTerm(cmd, "Dispatch Config Changes");
@@ -395,7 +401,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
 
     action = new QAction("Exit", this);
     action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q));
-    connect(action, &QAction::triggered, this, [this]()
+    connect(action, &QAction::triggered, this, []()
     {
         qApp->quit();
     });
@@ -407,11 +413,14 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     updateAskButton();
     updateClipButton();
 
+    ui->backButton->setVisible(false);
+    ui->forwardButton->setVisible(false);
     ui->lineEdit->setFocus();
 }
 
 BrowserWindow::~BrowserWindow()
 {
+    ui->tabWidget->closeAll();
     delete ui;
 }
 
@@ -472,7 +481,14 @@ void BrowserWindow::on_reloadButton_clicked()
     else
     {
         setWorking(true);
-        ui->tabWidget->currentView()->reload();
+        connect(ui->tabWidget->currentView(), SIGNAL(loadProgress(int)), ui->searchProgress, SLOT(setValue(int)));
+
+        bool hardReload = QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ShiftModifier) ||
+                          QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ControlModifier);
+        ui->tabWidget->currentView()->saveScrollPosition();
+        ui->tabWidget->currentView()->reload(hardReload);
+
+        disconnect(ui->tabWidget->currentView(), SIGNAL(loadProgress(int)), ui->searchProgress, SLOT(setValue(int)));
         setWorking(false);
         ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), ui->tabWidget->currentView()->icon());
     }
@@ -487,6 +503,23 @@ void BrowserWindow::stop()
     setWorking(false);
 }
 
+void BrowserWindow::handleEnabledChanged(BrowserView::WebAction action, bool enabled)
+{
+    switch (action)
+    {
+        case BrowserView::Back:
+            ui->backButton->setVisible(enabled);
+            break;
+
+        case BrowserView::Forward:
+            ui->forwardButton->setVisible(enabled);
+            break;
+
+        default:
+            break;
+    }
+}
+
 void BrowserWindow::setWorking(bool workin)
 {
     static QIcon stopIcon(":/img/ic_cancel_48px.svg");
@@ -499,7 +532,6 @@ void BrowserWindow::setWorking(bool workin)
 
         ui->searchProgress->setVisible(true);
         ui->lineEdit->setVisible(false);
-        qApp->processEvents();
     }
     else
     {
@@ -596,7 +628,7 @@ void BrowserWindow::install(QString atom, bool isWorld)
 
     if(installView == nullptr)
     {
-        installView = ui->tabWidget->createBackgroundTab();
+        installView = ui->tabWidget->createBrowserView();
         installView->setIcon(":/img/clipboard.svg");
     }
 
@@ -629,7 +661,8 @@ void BrowserWindow::uninstall(QString atom)
 
     if(uninstallView == nullptr)
     {
-        uninstallView = ui->tabWidget->createBackgroundTab();
+        int insertAfter = ui->tabWidget->currentIndex();
+        uninstallView = ui->tabWidget->createBackgroundTab(insertAfter);
         uninstallView->setIcon(":/img/clipboard.svg");
     }
 
@@ -667,6 +700,7 @@ void BrowserWindow::reloadDatabase()
     connect(rescan, SIGNAL(progress(int)), ui->searchProgress, SLOT(setValue(int)));
     connect(rescan, SIGNAL(finished()), this, SLOT(reloadDatabaseComplete()));
 
+    currentView()->saveScrollPosition();
     currentView()->reloadingDatabase();
     currentView()->setStatus("Loading package database...");
     rescan->rescan();
@@ -744,7 +778,48 @@ void BrowserWindow::closeEvent(QCloseEvent* event)
         return;
     }
 
+    if (ui->tabWidget->count() > 1)
+    {
+        int ret = QMessageBox::warning(this, tr("Confirm close"),
+                                       tr("Are you sure you want to close the window ?\n"
+                                          "There are %1 tabs open.").arg(ui->tabWidget->count()),
+                                       QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (ret == QMessageBox::No)
+        {
+            event->ignore();
+            return;
+        }
+    }
+
     event->accept();
-    ui->tabWidget->closeAll();
     deleteLater();
+}
+
+void BrowserWindow::keyPressEvent(QKeyEvent* event)
+{
+    int nextIndex;
+    switch(event->key())
+    {
+        case Qt::Key_Backtab:
+            nextIndex = ui->tabWidget->currentIndex();
+            nextIndex--;
+            if(nextIndex < 0)
+            {
+                nextIndex = ui->tabWidget->count() - 1;
+            }
+            ui->tabWidget->setCurrentIndex(nextIndex);
+            event->accept();
+            break;
+
+        case Qt::Key_Tab:
+            nextIndex = ui->tabWidget->currentIndex();
+            nextIndex++;
+            if(nextIndex >= ui->tabWidget->count())
+            {
+                nextIndex = 0;
+            }
+            ui->tabWidget->setCurrentIndex(nextIndex);
+            event->accept();
+            break;
+    }
 }

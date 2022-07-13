@@ -17,6 +17,8 @@
 #ifndef BROWSERWINDOW_H
 #define BROWSERWINDOW_H
 
+#include "browserview.h"
+
 #include <QMainWindow>
 
 QT_BEGIN_NAMESPACE
@@ -65,16 +67,17 @@ protected slots:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    virtual void keyPressEvent(QKeyEvent *event);
 
 private slots:
     void on_menuButton_pressed();
     void on_lineEdit_returnPressed();
     void workFinished();
 
-    void stop();
-
     void back();
     void forward();
+    void stop();
+    void handleEnabledChanged(BrowserView::WebAction action, bool enabled);
 
     void on_newTabButton_clicked();
     void on_reloadButton_clicked();
