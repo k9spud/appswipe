@@ -1,4 +1,4 @@
-// Copyright (c) 2021, K9spud LLC.
+// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -110,27 +110,81 @@ void TabWidget::setTabIcon(int index, const QIcon& icon)
 
 BrowserView* TabWidget::createTab()
 {
-    int insertAfter = currentIndex();
-    BrowserView* view = createBackgroundTab(insertAfter);
+    BrowserView* view = createBackgroundTab();
     setCurrentWidget(view);
     return view;
 }
 
 void TabWidget::openInNewTab(const QString& url)
 {
-    int insertAfter = currentIndex();
+    K9TabBar* tb = qobject_cast<K9TabBar*>(tabBar());
+    QRect before = tb->tabRect(0);
 
-    BrowserView* view = createBackgroundTab(insertAfter);
+    BrowserView* view = createBackgroundTab();
+
+    QRect after = tb->tabRect(0);
+    if(before.y() < after.y())
+    {
+        int ticks = (after.y() - before.y()) / after.height() + 1;
+        tb->scrollDown(ticks);
+        after = tb->tabRect(0);
+        if(before.y() > after.y())
+        {
+            tb->scrollUp();
+        }
+    }
+    else if(before.y() > after.y())
+    {
+        int ticks = (before.y() - after.y()) / after.height() + 1;
+        tb->scrollUp(ticks);
+        after = tb->tabRect(0);
+        if(before.y() < after.y())
+        {
+            tb->scrollDown();
+        }
+    }
+
     if(url.isEmpty() == false)
     {
         view->navigateTo(url);
     }
 }
 
-BrowserView* TabWidget::createBackgroundTab(int insertAfter)
+BrowserView* TabWidget::createBackgroundTab(int insertIndex)
+{
+    BrowserView* view = createBrowserView();
+
+    int index;
+    if(insertIndex == -1)
+    {
+        insertAfter++;
+        index = insertTab(insertAfter, view, "");
+    }
+    else if(insertIndex >= 0)
+    {
+        index = insertTab(insertIndex + 1, view, "");
+    }
+    else
+    {
+        index = addTab(view, "");
+    }
+    setTabIcon(index, view->icon());
+
+    return view;
+}
+
+BrowserView* TabWidget::createBrowserView()
 {
     BrowserView* view = new BrowserView();
     view->window = window;
+
+    connect(view, &BrowserView::enabledChanged, [this, view](BrowserView::WebAction action, bool enabled)
+    {
+        if(currentIndex() == indexOf(view))
+        {
+            emit enabledChanged(action, enabled);
+        }
+    });
 
     connect(view, &BrowserView::openInNewTab, this, &TabWidget::openInNewTab);
     connect(view, &BrowserView::titleChanged, [this, view](const QString& title)
@@ -161,17 +215,6 @@ BrowserView* TabWidget::createBackgroundTab(int insertAfter)
         }
     });
 
-    int index;
-    if(insertAfter != -1)
-    {
-        index = insertTab(insertAfter + 1, view, "");
-    }
-    else
-    {
-        index = addTab(view, "");
-    }
-    setTabIcon(index, view->icon());
-
     connect(view, &BrowserView::iconChanged, [this, view](QIcon icon)
     {
         if(currentView() == view)
@@ -199,16 +242,59 @@ void TabWidget::closeTab(int index)
     if(view != nullptr)
     {
         bool hasFocus = view->hasFocus();
+        K9TabBar* tb = qobject_cast<K9TabBar*>(tabBar());
+        QRect before = tb->tabRect(0);
+        int nextTab = currentIndex();
+
+        if(index == nextTab)
+        {
+            nextTab++;
+            if(nextTab > count())
+            {
+                nextTab = index - 1;
+            }
+
+            if(nextTab < 0)
+            {
+                nextTab = 0;
+            }
+        }
+
         removeTab(index);
+        if(count() == 0)
+        {
+            createTab();
+        }
+
+        QRect after = tb->tabRect(0);
+        if(before.y() < after.y())
+        {
+            int ticks = (after.y() - before.y()) / after.height() + 1;
+            tb->scrollDown(ticks);
+            after = tb->tabRect(0);
+            if(before.y() > after.y())
+            {
+                tb->scrollUp();
+            }
+        }
+        else if(before.y() > after.y())
+        {
+            int ticks = (before.y() - after.y()) / after.height() + 1;
+            tb->scrollUp(ticks);
+            after = tb->tabRect(0);
+            if(before.y() < after.y())
+            {
+                tb->scrollDown();
+            }
+        }
+
+        //setCurrentIndex(currentIndex());
+        
         if(hasFocus && count() > 0)
         {
             view->setFocus();
         }
 
-        if(count() == 0)
-        {
-            createTab();
-        }
         view->deleteLater();
     }
 }
@@ -231,8 +317,12 @@ void TabWidget::currentTabChanged(int index)
     {
         emit titleChanged(QString());
         emit urlChanged(QUrl());
+        emit enabledChanged(BrowserView::Back, false);
+        emit enabledChanged(BrowserView::Forward, false);
         return;
     }
+
+    insertAfter = index;
 
     BrowserView* view = tabView(index);
     if(view == nullptr)
@@ -245,15 +335,16 @@ void TabWidget::currentTabChanged(int index)
         view->load();
     }
 
-    if(!view->url().isEmpty())
+    if(view->url().isEmpty())
     {
-        view->setFocus();
+        window->focusLineEdit();
     }
     else
     {
-        window->focusLineEdit();
+        view->setFocus();
     }
 
     emit titleChanged(view->documentTitle());
     emit urlChanged(view->url());
+    view->checkEnables();
 }

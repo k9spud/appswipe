@@ -17,6 +17,8 @@
 #ifndef TABWIDGET_H
 #define TABWIDGET_H
 
+#include "browserview.h"
+
 #include <QWidget>
 #include <QTabWidget>
 
@@ -37,9 +39,12 @@ public:
 
     virtual void setTabIcon(int index, const QIcon& icon);
 
+    int insertAfter;
+
 public slots:
     BrowserView* createTab();
-    BrowserView* createBackgroundTab(int insertAfter = -1);
+    BrowserView* createBackgroundTab(int insertIndex = -1);
+    BrowserView* createBrowserView();
     void openInNewTab(const QString& url);
     void closeTab(int index);
     void closeAll();
@@ -47,6 +52,8 @@ public slots:
 signals:
     void urlChanged(const QUrl& url);
     void titleChanged(const QString& title);
+
+    void enabledChanged(BrowserView::WebAction action, bool enabled);
 
 private slots:
     void currentTabChanged(int index);
