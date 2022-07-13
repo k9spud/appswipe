@@ -9,13 +9,18 @@ upgrading apps.
 
 ![Screenshot](https://user-images.githubusercontent.com/39664841/139709601-35b9a8e7-e431-4631-98de-572ddafe5242.png)
 
-This program was written with Qt 5.15.3, ``dev-db/sqlite-3.38.2``, ``sys-apps/portage-3.0.30-r3``, 
+This program was written with Qt 5.15.3, ``dev-db/sqlite-3.38.5``, ``sys-apps/portage-3.0.30-r3``, 
 ``app-portage/portage-utils-0.93.3``, ``xfce-base/exo-4.17.1``, and ``lxde-base/lxterminal-0.4.0``.
 
 Installation
 ============
 
-There is an ebuild for App Swipe in my [k9spud-overlay](https://github.com/k9spud/k9spud-overlay). To add the k9spud-overlay to your system, do the following:
+There is an ebuild for App Swipe in my [k9spud-overlay](https://github.com/k9spud/k9spud-overlay). 
+Alternatively, there is an App Swipe ebuild in the [Project GURU](https://wiki.gentoo.org/wiki/Project:GURU) 
+repository, although theirs might lag a bit since I don't personally maintain 
+their ebuild.
+
+To add the k9spud-overlay to your system, do the following:
 
 ```console
 sudo su -
@@ -47,57 +52,103 @@ emerge app-portage/appswipe
 
 If all went well, you can now run the `appswipe` program from your normal user-level account.
 
-What's New in v1.1.14?
+Keyboard Shortcuts
+==================
+
+`CTRL-T` Opens a new tab.
+`CTRL-W` Closes the current tab.
+`CTRL-N` Opens a new window.
+`CTRL-Q` Saves each window's geometry and open tabs, then quits the application.
+
+`CTRL-TAB` Displays the next tab.
+`CTRL-SHIFT-TAB` Displays the prior tab.
+`CTRL-1` through `CTRL-9` Displays the first, second, etc tab.
+`CTRL-0` Displays the very last tab.
+`CTRL-backtick` Displays the `update:` upgradable package list tab. Opens one if none previously opened.
+
+`CTRL-L` Jumps to the URL input text box.
+`SHIFT-Return` Navigates to the first result of an application search.
+
+`F5` Refreshes the browser view (soft reload)
+`CTRL-R` Reloads the SQLite database for this app and refreshes view (hard reload).
+
+`ALT-Back Arrow Key` Displays the previous page in browser history.
+`ALT-Forward Arrow Key` Displays the next page in browser history.
+
+`CTRL-F` Searches browser view text.
+`F3` Repeats last search, moving forward.
+`SHIFT-F3` Repeats last search, going backwards.
+
+`Escape` Reserved for stopping long running browser view operations (probably inoperable at the moment, since we don't have any such slow operations, right?)
+
+`ALT-F` Opens the app menu.
+
+What's New in v1.1.20?
 ======================
 
-Added a new "View Updates" menu option. This attempts to build a suggested
-list of ebuilds that you will likely want to upgrade. It attempts to stay 
-within stable releases if the currently installed ebuild is stable -- this is
-something I find frustratingly lacking in portage. App Swipe does not attempt 
-to suggest upgrades beyond the currently installed slot, which portage 
-does do occasionally (with great success). I don't know how portage manages 
-that, so I can't mimic it yet.
+**TLDR: Faster and smoother.**
 
-This feature does not attempt to do any dependency resolving like portage 
-does, so it can give you a much faster result than doing an 
-"emerge --update @world" operation. But of course, this makes the App Swipe
-updates view rather blind to new packages that you may need to install 
-before upgrading particular ebuilds with new dependencies.
+On Wayland, the app was saving window sizes slightly smaller than actual, 
+because the window frame wasn't being included. This resulted in windows 
+getting slightly smaller each time the app was closed and re-opened, which
+was annoying.
 
-Added more support for detecting whether an ebuild has been masked by one
-of the very many ways portage has for masking them.
+Now hides Forward/Back toolbar buttons when not actually available for use. 
+This leaves more room for the URL input text edit box.
 
-Fixed some bugs in the way the app determines if an ebuild's status on the
-current CPU architecture (aka "keyword") is stable, testing, or unknown. 
-The SQLite database schema has been updated to include a STATUS column so 
-that querying this information is easier to do.
+Fixed some bugs with saving the current scroll position of the browser view
+when hitting Forward/Back. 
 
-Fixed some bugs with moving the mouse over top of links making the status 
-bar and cursor shape wonky in certain edge cases.
+Fixed a bug where the Run/Build time dependencies list was sometimes off by 
+one.
 
-Fixed a bug where the result count when doing a search came out wrong
-sometimes.
+Hitting the `Refresh` button in the browser view now does a "soft reload" of 
+the ebuild that is much faster by avoiding reparsing ebuilds that haven't
+likely actually changed and avoiding the really slow apply masks operation. 
+You can still get the old "hard reload" behavior by holding down `CTRL` and 
+clicking `Refresh` or simply pressing `CTRL-R` by itself. 
 
-Added SHIFT-Return keyboard shortcut in the URL editing box so that App Swipe
-jumps straight into the first app of the search results list (akin to Google's 
-Feeling Lucky button).
+Added "Are you sure?" prompt when attempting to close a window with more 
+than one tab.
 
-CTRL-L keyboard shortcut now selects all text in the URL editing box if 
-you're already focused inside that box.
+Improved availability of `CTRL-Tab` and `CTRL-SHIFT-Tab` hotkeys when input 
+focus is on the wrong spot.
 
-Added CTRL-1, CTRL-2, CTRL-3, etc keyboard shortcuts for quickly switching to
-the first, second, third, etc respective browsing tab. CTRL-0 jumps down to 
-the very last tab (regardless of whatever tab number that happens to be).
+Improved the color of toolbar buttons when clicking on them. Shrunk the
+browser scroll bars so that they are right up against the edge of the window 
+instead of having a one pixel gap.
 
-Added ALT-F keyboard shortcut for opening the app menu.
+When adding or removing a tab, Qt does some bizarre things with 
+re-positioning the display of available tabs if there are enough tabs to 
+scroll off the display. Added code to try to counteract Qt's brain-dead 
+re-positioning of the tab bar scroll position. It's not perfect, but it is
+about as close as I can get using the limited access Qt provides
+for manipulating the tab bar's scroll position.
 
-Opening a new tab now pops up under the currently shown tab instead of adding
-itself all the way down at the end of all the existing tabs.
+Starting an ebuild install now invokes the portage-utils `qlop` tool to
+(sometimes) provide a rough build time estimate.
 
-Instead of showing the raw USE/IUSE flags, we now only display the IUSE flags
-that did not get used in the installed build. This makes it easier to find
-what USE flags you could be using, particularly for ebuilds that have a lot 
-of flags available.
+Now handles UNIX SIGHUP and SIGTERM signals. SIGTERM causes the app to 
+immediately save all the window sizes and tabs to the underlying SQLite 
+database (normally done only when exiting the app). 
+
+SIGHUP causes each open browser tab to refresh it's display of the 
+underlying data. 
+
+Added some rudimentary inter-process communication using these signals so 
+that after an ebuild has been successfully installed/uninstalled,
+the GUI will automatically refresh to reflect the now current state. Added
+`-emerged`, `-synced`, and `-pid` command line options for GUI-less updating
+of the underlying SQLite database and notifying the GUI to refresh.
+
+Unfortunately, this feature does not (yet) attempt to do any scanning of 
+`/var/log/emerge` to pick up on any *additional* ebuilds that got sucked into 
+being upgraded or installed by dependency. So you still need to manually 
+`Reload Database` from time to time to keep AppSwipe's internal SQLite 
+database up-to-date with the actual system state.
+
+Fixed bug in ebuild parsing. String assignments with embedded escaped quotation
+marks might work now.
 
 License
 =======
