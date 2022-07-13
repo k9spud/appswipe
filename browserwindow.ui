@@ -18,18 +18,16 @@
 font: 13pt &quot;Roboto&quot;;
 background-color: rgb(0, 0, 0);
 selection-color: rgb(255, 255, 240);
-selection-background-color: rgb(0, 100, 0)
-</string>
+selection-background-color: rgb(0, 100, 0);</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="styleSheet">
-    <string notr="true">
-/*QPushButton {
-     border: none;
-     border-radius: 0px;
-	 background-color: #00008080;
- }
+    <string notr="true">QPushButton:pressed {
+     border-radius: 10px;
+	 background-color: #454545FF;
+}
 
+/*
  QPushButton:flat {
      border: none; 
  }
@@ -70,7 +68,7 @@ QLineEdit {
 QScrollBar:vertical
 {
     background: #00000010;
-    width: 14px;
+    width: 12px;
     border: 0px solid #808080;
     border-top-left-radius: 7px;
     border-top-right-radius: 7px;
@@ -91,7 +89,7 @@ QScrollBar::handle:vertical
     border-top-right-radius: 5px;
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
-    margin: 1px
+/*    margin: 1px*/
 }
 
 /* this is the one line up button */
@@ -131,7 +129,7 @@ QScrollBar:horizontal
 {
     background: #00000000;
 
-    height: 14px;
+    height: 12px;
 
     border: 0px solid #808080;
     border-top-left-radius: 7px;
@@ -149,7 +147,7 @@ QScrollBar::handle:horizontal
     border-top-right-radius: 5px;
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
-    margin: 1px
+   /* margin: 1px */
 }
 
 /* this is the one line up button */
