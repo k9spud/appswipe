@@ -1,4 +1,4 @@
-// Copyright (c) 2021, K9spud LLC.
+// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -49,7 +49,7 @@ void RescanThread::rescan()
     start();
 }
 
-void RescanThread::run()
+void RescanThread::reloadDatabase()
 {
     QSqlDatabase db;
     if(QSqlDatabase::contains("RescanThread") == false)
@@ -181,7 +181,7 @@ values
     query.prepare(sql);
     for(int repoId = 0; repoId < portage->repos.count(); repoId++)
     {
-        qDebug() << "Scanning repo:" << portage->repos.at(repoId);
+        qDebug().noquote() << QString("Loading %1").arg(portage->repos.at(repoId));
         for(int categoryId = 0; categoryId < categories.count(); categoryId++)
         {
             if(abort)
@@ -316,7 +316,7 @@ values
     pvsplit.setPattern("(.+)-([0-9][0-9,\\-,\\.,[A-z]*)");
     QString package;
 
-    qDebug() << "Scanning installed packages...";
+    qDebug() << "Loading /var/db/pkg/";
     for(int categoryId = 0; categoryId < categories.count(); categoryId++)
     {
         if(abort)
@@ -456,7 +456,14 @@ values
         emit progress(100.0f * static_cast<float>(progressCount++) / static_cast<float>(folderCount));
     }
     db.commit();
+    qDebug() << "Applying masks";
     portage->applyMasks(db);
     emit progress(100);
+    qDebug() << "Done.";
+}
+
+void RescanThread::run()
+{
+    reloadDatabase();
     qDebug() << "Rescan thread finished.";
 }

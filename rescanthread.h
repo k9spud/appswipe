@@ -30,7 +30,7 @@ public:
     bool abort;
 
     void rescan();
-
+    void reloadDatabase(void);
     
 signals:
     void progress(int percent);
