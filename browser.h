@@ -19,6 +19,7 @@
 
 #include <QObject>
 #include <QVector>
+#include <QSocketNotifier>
 
 class BrowserWindow;
 class Browser : public QObject
@@ -34,8 +35,22 @@ public:
     void closeAll();
     void saveSettings();
 
+    // Unix signal handlers
+    static void unixSIGHUP(int unused);
+    static void unixSIGTERM(int unused);
+
+    bool isWayland();
+    
+public slots:
+    // Qt signal handlers
+    void handleSIGHUP(void);
+    void handleSIGTERM(void);
+
 signals:
 
+private:
+    QSocketNotifier* sighupNotifier;
+    QSocketNotifier* sigtermNotifier;
 };
 
 #endif // BROWSER_H

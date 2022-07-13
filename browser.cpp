@@ -20,11 +20,18 @@
 #include "browserview.h"
 #include "datastorage.h"
 
+#include <unistd.h>
+#include <sys/socket.h>
+#include <signal.h>
 #include <QApplication>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QIcon>
 #include <QDebug>
+#include <QProcessEnvironment>
+
+int sighupFd[2];
+int sigtermFd[2];
 
 Browser::Browser(QObject *parent) : QObject(parent)
 {
@@ -42,13 +49,20 @@ Browser::Browser(QObject *parent) : QObject(parent)
     int scrollX, scrollY;
     int currentPage;
     int page;
+
+    int x, y, w, h;
     if(qwindow.exec("select WINDOWID, X, Y, W, H from WINDOW order by WINDOWID"))
     {
         while(qwindow.next())
         {
             windowId = qwindow.value(0).toInt();
             window = createWindow();
-            window->setGeometry(qwindow.value(1).toInt(), qwindow.value(2).toInt(), qwindow.value(3).toInt(), qwindow.value(4).toInt());
+            x = qwindow.value(1).toInt();
+            y = qwindow.value(2).toInt();
+            w = qwindow.value(3).toInt();
+            h = qwindow.value(4).toInt();
+
+            window->setGeometry(x, y, w, h);
             //window->resize(qwindow.value(3).toInt(), qwindow.value(4).toInt());
 
             qry.bindValue(0, windowId);
@@ -99,6 +113,101 @@ Browser::Browser(QObject *parent) : QObject(parent)
             window->show();
         }
     }
+
+    // initialize SIGHUP/SIGTERM signal handling
+    if(::socketpair(AF_UNIX, SOCK_STREAM, 0, sighupFd))
+    {
+       qDebug("Couldn't create SIGHUP socketpair");
+    }
+    else
+    {
+        sighupNotifier = new QSocketNotifier(sighupFd[1], QSocketNotifier::Read, this);
+        connect(sighupNotifier, SIGNAL(activated(QSocketDescriptor)), this, SLOT(handleSIGHUP()));
+
+        struct sigaction hup;
+
+        hup.sa_handler = Browser::unixSIGHUP;
+        sigemptyset(&hup.sa_mask);
+        hup.sa_flags = 0;
+        hup.sa_flags |= SA_RESTART;
+
+        sigaction(SIGHUP, &hup, 0);
+    }
+
+    if(::socketpair(AF_UNIX, SOCK_STREAM, 0, sigtermFd))
+    {
+       qDebug("Couldn't create SIGTERM socketpair");
+    }
+    else
+    {
+        sigtermNotifier = new QSocketNotifier(sigtermFd[1], QSocketNotifier::Read, this);
+        connect(sigtermNotifier, SIGNAL(activated(QSocketDescriptor)), this, SLOT(handleSIGTERM()));
+
+        struct sigaction term;
+
+        term.sa_handler = Browser::unixSIGTERM;
+        sigemptyset(&term.sa_mask);
+        term.sa_flags = 0;
+        term.sa_flags |= SA_RESTART;
+
+        sigaction(SIGTERM, &term, 0);
+    }
+}
+
+void Browser::unixSIGHUP(int unused)
+{
+    Q_UNUSED(unused);
+    char a = 1;
+    ::write(sighupFd[0], &a, sizeof(a));
+}
+
+void Browser::unixSIGTERM(int unused)
+{
+    Q_UNUSED(unused);
+    char a = 1;
+    ::write(sigtermFd[0], &a, sizeof(a));
+}
+
+void Browser::handleSIGHUP()
+{
+    sighupNotifier->setEnabled(false);
+    char tmp;
+    ::read(sighupFd[1], &tmp, sizeof(tmp));
+
+    BrowserView* v;
+    TabWidget* tabs;
+    foreach(BrowserWindow* w, windows)
+    {
+        tabs = w->tabWidget();
+        for(int i = 0; i < tabs->count(); i++)
+        {
+            v = tabs->tabView(i);
+            if(v->delayLoading)
+            {
+                continue;
+            }
+
+            if(v->url().startsWith("app:") || v->url().startsWith("update:"))
+            {
+                v->saveScrollPosition();
+                v->reload(false);
+            }
+        }
+    }
+
+    sighupNotifier->setEnabled(true);
+}
+
+void Browser::handleSIGTERM()
+{
+    sigtermNotifier->setEnabled(false);
+    char tmp;
+    ::read(sigtermFd[1], &tmp, sizeof(tmp));
+
+    qDebug() << "Saving windows/tabs.";
+    saveSettings();
+
+    sigtermNotifier->setEnabled(true);
 }
 
 Browser::~Browser()
@@ -125,9 +234,28 @@ void Browser::closeAll()
 {
     foreach(BrowserWindow* window, windows)
     {
-        window->close();
-        qApp->processEvents();
+        window->deleteLater();
     }
+    windows.clear();
+}
+
+bool Browser::isWayland()
+{
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    if(env.contains("XDG_SESSION_TYPE"))
+    {
+        QString sessionType = env.value("XDG_SESSION_TYPE").toLatin1();
+        if(sessionType == "wayland")
+        {
+            return true;
+        }
+    }
+    else if(env.contains("WAYLAND_DISPLAY"))
+    {
+        return true;
+    }
+
+    return false;
 }
 
 void Browser::saveSettings()
@@ -150,7 +278,15 @@ void Browser::saveSettings()
     QRect r;
     foreach(BrowserWindow* window, windows)
     {
-        r = window->geometry();
+        if(isWayland())
+        {
+            r = window->frameGeometry();
+        }
+        else
+        {
+            r = window->geometry();
+        }
+
         qwindow.bindValue(0, windowId);
         qwindow.bindValue(1, r.x());
         qwindow.bindValue(2, r.y());
