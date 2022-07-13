@@ -56,27 +56,39 @@ Keyboard Shortcuts
 ==================
 
 `CTRL-T` Opens a new tab.
+
 `CTRL-W` Closes the current tab.
+
 `CTRL-N` Opens a new window.
+
 `CTRL-Q` Saves each window's geometry and open tabs, then quits the application.
 
 `CTRL-TAB` Displays the next tab.
+
 `CTRL-SHIFT-TAB` Displays the prior tab.
+
 `CTRL-1` through `CTRL-9` Displays the first, second, etc tab.
+
 `CTRL-0` Displays the very last tab.
+
 `CTRL-backtick` Displays the `update:` upgradable package list tab. Opens one if none previously opened.
 
 `CTRL-L` Jumps to the URL input text box.
+
 `SHIFT-Return` Navigates to the first result of an application search.
 
 `F5` Refreshes the browser view (soft reload)
+
 `CTRL-R` Reloads the SQLite database for this app and refreshes view (hard reload).
 
 `ALT-Back Arrow Key` Displays the previous page in browser history.
+
 `ALT-Forward Arrow Key` Displays the next page in browser history.
 
 `CTRL-F` Searches browser view text.
+
 `F3` Repeats last search, moving forward.
+
 `SHIFT-F3` Repeats last search, going backwards.
 
 `Escape` Reserved for stopping long running browser view operations (probably inoperable at the moment, since we don't have any such slow operations, right?)
