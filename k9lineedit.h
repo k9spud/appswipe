@@ -26,7 +26,7 @@ public:
     explicit K9LineEdit(QWidget *parent = nullptr);
 
 protected:
-    virtual void keyPressEvent(QKeyEvent *event);
+    virtual void keyPressEvent(QKeyEvent *event) override;
 
 signals:
 
