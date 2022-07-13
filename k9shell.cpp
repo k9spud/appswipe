@@ -1,4 +1,4 @@
-// Copyright (c) 2021, K9spud LLC.
+// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,6 +19,7 @@
 #include <QTemporaryFile>
 #include <QTextStream>
 #include <QDebug>
+#include <QApplication>
 
 K9Shell* shell = nullptr;
 
@@ -39,7 +40,7 @@ void K9Shell::externalTerm(QString cmd)
     externalTerm(cmd, cmd);
 }
 
-void K9Shell::externalTerm(QString cmd, QString title, bool waitSuccessful)
+void K9Shell::externalTerm(QString script, QString title, bool waitSuccessful)
 {
     QTemporaryFile* tmp = new QTemporaryFile();
     if(tmp->open() == false)
@@ -50,16 +51,34 @@ void K9Shell::externalTerm(QString cmd, QString title, bool waitSuccessful)
     }
 
     QTextStream out(tmp);
-    QString escaped = cmd;
-    if(escaped.contains("\""))
+    QString escaped;
+
+    QStringList cmds = script.split("\n");
+    QString cmd;
+    for(int i = 0; i < cmds.count(); i++)
     {
-        escaped.replace("\"", "\\\"");
+        cmd = cmds.at(i);
+        escaped = cmd;
+        if(escaped.contains("\""))
+        {
+            escaped.replace("\"", "\\\"");
+        }
+
+        if(cmd.contains("RET_CODE=$?") == false &&
+           cmd.contains(QString("%1").arg(qApp->applicationFilePath())) == false)
+        {
+            out << "echo \"" << escaped << "\"\n";
+        }
+        out << cmd << "\n";
     }
-    out << "echo \"" << escaped << "\"\n";
-    out << cmd << "\n";
+
     if(cmd.endsWith("| less") == false)
     {
-        out << "RET_CODE=$?\n";
+        if(script.contains("RET_CODE=$?") == false)
+        {
+            out << "RET_CODE=$?\n";
+        }
+
         if(waitSuccessful == false)
         {
             out << "if [[ $RET_CODE -eq 0 ]];\n";
