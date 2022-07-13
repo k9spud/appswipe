@@ -73,7 +73,8 @@ public:
 
     void applyMasks(QSqlDatabase& db);
     void readMaskFile(QString fileName, QSqlQuery& query);
-    
+    void reloadApp(QString app);
+
     enum PackageStatus
     {
         UNKNOWN = 0,

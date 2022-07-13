@@ -1,4 +1,4 @@
-// Copyright (c) 2021, K9spud LLC.
+// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -15,6 +15,7 @@
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "k9portage.h"
+#include "datastorage.h"
 
 #include <QDir>
 #include <QDebug>
@@ -23,6 +24,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QDateTime>
 
 K9Portage::K9Portage(QObject *parent) : QObject(parent)
 {
@@ -30,7 +32,7 @@ K9Portage::K9Portage(QObject *parent) : QObject(parent)
     digitVersion.setPattern("([0-9]+)");
     alphaVersion.setPattern("([A-Za-z]+)");
 
-    stringAssignment.setPattern("(.+)\\s*=\\s*\"([^\"]*)\"");
+    stringAssignment.setPattern("(.+)\\s*=\\s*\"((\\\\\"|[^\"])*)\"");
     variableAssignment.setPattern("(.+)\\s*=\\s*([^\"]*)");
     verCutSingle.setPattern("\\$\\((ver_cut|get_version_component_range)\\s+([0-9]+)\\)");
     verCutRange.setPattern("\\$\\((ver_cut|get_version_component_range)\\s+([0-9]+)-([0-9]+)\\)");
@@ -166,12 +168,15 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
 {
     QFile input;
     input.setFileName(fileName);
-    if(!input.exists() || !input.open(QIODevice::ReadOnly))
+    if(!input.exists() || !input.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         return;
     }
 
-    QTextStream in;
+    QString wholeFile = input.readAll();
+    input.close();
+    QStringList lines = wholeFile.split('\n');
+
     QRegularExpressionMatch match;
     QString clauses;
     VersionString vs;
@@ -183,10 +188,8 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
     QString repo;
     QString slot;
 
-    in.setDevice(&input);
-    while(in.atEnd() == false)
+    foreach(s, lines)
     {
-        s = in.readLine();
         s = s.trimmed();
         if(s.isEmpty() || s.startsWith('#'))
         {
@@ -633,8 +636,101 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
         qDebug() << "  " << s;
         continue;
     }
+}
 
-    input.close();
+void K9Portage::reloadApp(QString app)
+{
+    QSqlDatabase db;
+    if(QSqlDatabase::contains("GuiThread") == false)
+    {
+        db = QSqlDatabase::addDatabase("QSQLITE", "GuiThread");
+    }
+    else
+    {
+        db = QSqlDatabase::database("GuiThread");
+        if(db.isValid())
+        {
+            db.close();
+        }
+    }
+
+    db.setDatabaseName(ds->storageFolder + ds->databaseFileName);
+    db.open();
+
+    QSqlQuery query(db);
+    QSqlQuery updatePackage(db);
+    QSqlQuery deletePackage(db);
+    query.prepare("select PACKAGEID, VERSION, INSTALLED, OBSOLETED from PACKAGE where CATEGORYID=(select CATEGORYID from CATEGORY where CATEGORY=?) and PACKAGE=?");
+    updatePackage.prepare("update PACKAGE set INSTALLED=? where PACKAGEID=?");
+    deletePackage.prepare("delete from PACKAGE where PACKAGEID=?");
+
+    QStringList x = app.split('/');
+    QString category = x.first();
+    QString packageName = x.last();
+    query.bindValue(0, category);
+    query.bindValue(1, packageName);
+
+    if(query.exec() == false || query.first() == false)
+    {
+        return;
+    }
+
+    qint64 packageId;
+    qint64 installed;
+    QString version;
+    QString installedFilePath;
+    QString categoryPath;
+    QFileInfo fi;
+    bool obsoleted;
+
+//    db.transaction();
+    do
+    {
+        packageId = query.value(0).toInt();
+        version = query.value(1).toString();
+        installed = query.value(2).toInt();
+        obsoleted = query.value(3).toInt() != 0;
+
+        installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(category).arg(packageName).arg(version);
+        fi.setFile(installedFilePath);
+        if(fi.exists())
+        {
+            if(installed == 0)
+            {
+                installed = fi.birthTime().toSecsSinceEpoch();
+                updatePackage.bindValue(0, installed);
+                updatePackage.bindValue(1, packageId);
+                if(updatePackage.exec() == false)
+                {
+                    qDebug() << QString("update installed %1/%2-%3 failed").arg(category).arg(packageName).arg(version);
+                }
+            }
+        }
+        else
+        {
+            if(installed)
+            {
+                if(obsoleted)
+                {
+                    deletePackage.bindValue(0, packageId);
+                    if(deletePackage.exec() == false)
+                    {
+                        qDebug() << QString("delete uninstalled obsolete %1/%2-%3 failed").arg(category).arg(packageName).arg(version);
+                    }
+                }
+                else
+                {
+                    installed = 0;
+                    updatePackage.bindValue(0, installed);
+                    updatePackage.bindValue(1, packageId);
+                    if(updatePackage.exec() == false)
+                    {
+                        qDebug() << QString("update uninstalled %1/%2-%3 failed").arg(category).arg(packageName).arg(version);
+                    }
+                }
+            }
+        }
+    } while(query.next());
 }
 
 void K9Portage::applyMasks(QSqlDatabase& db)
@@ -906,7 +1002,7 @@ void K9Portage::ebuildReader(QString fileName)
         if(match.hasMatch() && match.lastCapturedIndex() >= 2)
         {
             key = match.captured(1).toUpper();
-            value = match.captured(2);
+            value = match.captured(2).replace("\\\"", "\"");
         }
         else
         {
