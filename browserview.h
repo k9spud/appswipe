@@ -54,6 +54,7 @@ public:
     QString title() const;
     QPoint scrollPosition();
     void setScrollPosition(int x, int y);
+    void saveScrollPosition();
     QIcon icon();
     void setIcon(QString fileName);
     QIcon siteIcon;
@@ -69,13 +70,22 @@ public:
     BrowserWindow* window;
 
     void resizeStatusBar();
-    
+
+    enum WebAction {
+        NoWebAction = - 1,
+        Back,
+        Forward,
+        Stop,
+        Reload
+    };
+
 signals:
     void urlChanged(const QUrl& url);
     void titleChanged(const QString& title);
     void iconChanged(const QIcon &icon);
+    void enabledChanged(WebAction action, bool enabled);
     void loadStarted();
-    void loadProgress(int progress);
+    void loadProgress(int percent);
     void loadFinished(bool ok);
     void openInNewTab(const QString& url);
 
@@ -98,6 +108,7 @@ public slots:
     void reloadApp(const QUrl& url);
     void searchApps(QString search, bool feelingLucky = false);
     void whatsNew(QString search, bool feelingLucky = false);
+    void checkEnables(void);
 
 protected slots:
     void swipeUpdate(void);
