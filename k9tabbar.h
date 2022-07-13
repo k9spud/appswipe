@@ -24,11 +24,14 @@ class QLabel;
 class QPushButton;
 class K9TabBar : public QTabBar
 {
+    Q_OBJECT
 public:
     K9TabBar(QWidget *parent = nullptr);
     ~K9TabBar();
 
     void showTabLabel(int tab);
+    void scrollUp(int ticks = 1);
+    void scrollDown(int ticks = 1);
 
 protected:
     bool eventFilter(QObject *object, QEvent *event) override;

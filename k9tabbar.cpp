@@ -1,4 +1,4 @@
-// Copyright (c) 2021, K9spud LLC.
+// Copyright (c) 2021-2022, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -33,6 +33,7 @@
 K9TabBar::K9TabBar(QWidget* parent) : QTabBar(parent)
 {
     setMouseTracking(true);
+
     label = new QLabel(parent);
     label->setVisible(false);
     label->setWordWrap(true);
@@ -69,39 +70,19 @@ bool K9TabBar::eventFilter(QObject* object, QEvent* event)
 // instead makes the mouse wheel scroll up and down the list of tabs without switching.
 void K9TabBar::wheelEvent(QWheelEvent* event)
 {
-    QToolButton* btn;
     int dy = event->angleDelta().y();
-    foreach(QObject* o, children())
+    if(dy > 0)
     {
-        btn = qobject_cast<QToolButton*>(o);
-        if(btn != nullptr)
-        {
-            if(dy > 0)
-            {
-                if(btn->arrowType() == Qt::UpArrow)
-                {
-                    emit btn->clicked(true);
-                    qApp->processEvents();
-                    QPointF pos = event->position();
-                    int tab = tabAt(pos.toPoint());
-                    showTabLabel(tab);
-                    break;
-                }
-            }
-            else
-            {
-                if(btn->arrowType() == Qt::DownArrow)
-                {
-                    emit btn->clicked(true);
-                    qApp->processEvents();
-                    QPointF pos = event->position();
-                    int tab = tabAt(pos.toPoint());
-                    showTabLabel(tab);
-                    break;
-                }
-            }
-        }
+        scrollUp();
     }
+    else
+    {
+        scrollDown();
+    }
+
+    QPointF pos = event->position();
+    int tab = tabAt(pos.toPoint());
+    showTabLabel(tab);
 
     event->accept();
 }
@@ -194,4 +175,46 @@ void K9TabBar::leaveEvent(QEvent* event)
 
     showTabLabel(-1);
     QTabBar::leaveEvent(event);
+}
+
+void K9TabBar::scrollUp(int ticks)
+{
+    QToolButton* btn;
+    foreach(QObject* o, children())
+    {
+        btn = qobject_cast<QToolButton*>(o);
+        if(btn != nullptr)
+        {
+            if(btn->arrowType() == Qt::UpArrow)
+            {
+                for(int i = 0; i < ticks; i++)
+                {
+                    emit btn->clicked(true);
+                }
+                qApp->processEvents();
+                break;
+            }
+        }
+    }
+}
+
+void K9TabBar::scrollDown(int ticks)
+{
+    QToolButton* btn;
+    foreach(QObject* o, children())
+    {
+        btn = qobject_cast<QToolButton*>(o);
+        if(btn != nullptr)
+        {
+            if(btn->arrowType() == Qt::DownArrow)
+            {
+                for(int i = 0; i < ticks; i++)
+                {
+                    emit btn->clicked(true);
+                }
+                qApp->processEvents();
+                break;
+            }
+        }
+    }
 }
