@@ -95,7 +95,7 @@ Keyboard Shortcuts
 
 `ALT-F` Opens the app menu.
 
-What's New in v1.1.20?
+What's New in v1.1.21?
 ======================
 
 **TLDR: Faster and smoother.**
