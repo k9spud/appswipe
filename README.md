@@ -1,6 +1,7 @@
+
 App Swipe
 =========
-Copyright (c) 2021-2022, K9spud LLC
+Copyright (c) 2021-2023, K9spud LLC
 
 This is an application for browsing your local Portage repository files.
 Easily manage your system's applications from a point and click user interface
@@ -9,14 +10,17 @@ upgrading apps.
 
 ![Screenshot](https://user-images.githubusercontent.com/39664841/139709601-35b9a8e7-e431-4631-98de-572ddafe5242.png)
 
-This program was written with Qt 5.15.3, ``dev-db/sqlite-3.38.5``, ``sys-apps/portage-3.0.30-r3``, 
-``app-portage/portage-utils-0.93.3``, ``xfce-base/exo-4.17.1``, and ``lxde-base/lxterminal-0.4.0``.
+This program was written with Qt 5.15.7, ``dev-db/sqlite-3.40.1``, 
+``sys-apps/portage-3.0.41-r2``, ``app-portage/portage-utils-0.94.3``, 
+``dev-libs/glib-2.74.3-r3``, and ``lxde-base/lxterminal-0.4.0``.
 
 Installation
 ============
 
-There is an ebuild for App Swipe in my [k9spud-overlay](https://github.com/k9spud/k9spud-overlay). 
-Alternatively, there is an App Swipe ebuild in the [Project GURU](https://wiki.gentoo.org/wiki/Project:GURU) 
+There is an ebuild for App Swipe in my 
+[k9spud-overlay](https://github.com/k9spud/k9spud-overlay). 
+Alternatively, there is an App Swipe ebuild in the 
+[Project GURU](https://wiki.gentoo.org/wiki/Project:GURU) 
 repository, although theirs might lag a bit since I don't personally maintain 
 their ebuild.
 
@@ -50,7 +54,8 @@ After that, use the following to install App Swipe:
 emerge app-portage/appswipe
 ```
 
-If all went well, you can now run the `appswipe` program from your normal user-level account.
+If all went well, you can now run the `appswipe` program from your normal 
+user-level account.
 
 Keyboard Shortcuts
 ==================
@@ -95,72 +100,37 @@ Keyboard Shortcuts
 
 `ALT-F` Opens the app menu.
 
-What's New in v1.1.21?
+What's New in v1.1.34?
 ======================
 
-**TLDR: Faster and smoother.**
+Added a workaround for popup menus showing up at the wrong location on screen
+when using Wayland.
 
-On Wayland, the app was saving window sizes slightly smaller than actual, 
-because the window frame wasn't being included. This resulted in windows 
-getting slightly smaller each time the app was closed and re-opened, which
-was annoying.
+Now ignores differences in the "subslot" number when generating an "update:" 
+list, to better match what Portage does.
 
-Now hides Forward/Back toolbar buttons when not actually available for use. 
-This leaves more room for the URL input text edit box.
+"List files owned" now displays the package's file list in-app instead of 
+launching an external terminal window. This is still kind of clunky though,
+because Qt's QTextEdit widget chokes if you get a list of files that is too
+long. For now, we simply truncate the list if it exceeds 2,000 entries.
 
-Fixed some bugs with saving the current scroll position of the browser view
-when hitting Forward/Back. 
+Using an URL like "file:///" allows you to browse your file system 
+like old web browsers used to do for FTP sites. Added image viewing mode.
 
-Fixed a bug where the Run/Build time dependencies list was sometimes off by 
-one.
+Added right click menu option to "Build binary package" for those times when
+you want to build a package, but not install it immediately. 
 
-Hitting the `Refresh` button in the browser view now does a "soft reload" of 
-the ebuild that is much faster by avoiding reparsing ebuilds that haven't
-likely actually changed and avoiding the really slow apply masks operation. 
-You can still get the old "hard reload" behavior by holding down `CTRL` and 
-clicking `Refresh` or simply pressing `CTRL-R` by itself. 
+No longer uses XFCE's "exo" launcher and instead uses the "gio" launcher from
+``dev-libs/glib`` for launching an external browser. This eliminates the 
+dependency on XFCE, which itself was depending on ``dev-libs/glib`` under
+the hood anyway.
 
-Added "Are you sure?" prompt when attempting to close a window with more 
-than one tab.
+Fixed a bug where closing the clipboard tab could cause the program to 
+segfault. The clipboard contents is now saved and restored when shutting down
+the application. 
 
-Improved availability of `CTRL-Tab` and `CTRL-SHIFT-Tab` hotkeys when input 
-focus is on the wrong spot.
-
-Improved the color of toolbar buttons when clicking on them. Shrunk the
-browser scroll bars so that they are right up against the edge of the window 
-instead of having a one pixel gap.
-
-When adding or removing a tab, Qt does some bizarre things with 
-re-positioning the display of available tabs if there are enough tabs to 
-scroll off the display. Added code to try to counteract Qt's brain-dead 
-re-positioning of the tab bar scroll position. It's not perfect, but it is
-about as close as I can get using the limited access Qt provides
-for manipulating the tab bar's scroll position.
-
-Starting an ebuild install now invokes the portage-utils `qlop` tool to
-(sometimes) provide a rough build time estimate.
-
-Now handles UNIX SIGHUP and SIGTERM signals. SIGTERM causes the app to 
-immediately save all the window sizes and tabs to the underlying SQLite 
-database (normally done only when exiting the app). 
-
-SIGHUP causes each open browser tab to refresh it's display of the 
-underlying data. 
-
-Added some rudimentary inter-process communication using these signals so 
-that after an ebuild has been successfully installed/uninstalled,
-the GUI will automatically refresh to reflect the now current state. Added
-`-emerged`, `-synced`, and `-pid` command line options for GUI-less updating
-of the underlying SQLite database and notifying the GUI to refresh.
-
-Unfortunately, this feature does not (yet) attempt to do any scanning of 
-`/var/log/emerge` to pick up on any *additional* ebuilds that got sucked into 
-being upgraded or installed by dependency. So you still need to manually 
-`Reload Database` from time to time to keep AppSwipe's internal SQLite 
-database up-to-date with the actual system state.
-
-Fixed bug in ebuild parsing. String assignments with embedded escaped quotation
-marks might work now.
+Long pressing Forward/Back buttons now pops up a menu of page history for
+the given direction.
 
 License
 =======
