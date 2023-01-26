@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,3 +19,32 @@
 
 K9Portage* portage = nullptr;
 RescanThread* rescan = nullptr;
+
+QString fileSize(qint64 size)
+{
+    QString s;
+    if(size > 1024 * 1024 * 1024)
+    {
+        s = QString::number((size * 100) / (1024 * 1024 * 1024));
+        s.insert(s.length() - 2, ".");
+        s.append(" GB");
+    }
+    else if(size > 1024 * 1024)
+    {
+        s = QString::number((size * 10) / (1024 * 1024));
+        s.insert(s.length() - 1, ".");
+        s.append(" MB");
+    }
+    else if(size > 1024)
+    {
+        s = QString::number((size * 10) / 1024);
+        s.insert(s.length() - 1, ".");
+        s.append(" KB");
+    }
+    else
+    {
+        s = QString::number(size) + " bytes";
+    }
+
+    return s;
+}

@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -17,7 +17,11 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
+#include <QString>
+
 extern class K9Portage* portage;
 extern class RescanThread* rescan;
+
+QString fileSize(qint64 size);
 
 #endif // GLOBALS_H
