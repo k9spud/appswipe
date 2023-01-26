@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -155,6 +155,8 @@ void RescanThread::reloadDatabase()
     QString installedFilePath;
     QString repoFilePath;
     QString packageName;
+    QString slot;
+    QString subslot;
     int downloadSize = -1;
     qint64 published = 0;
     qint64 status = K9Portage::UNKNOWN;
@@ -170,12 +172,12 @@ void RescanThread::reloadDatabase()
 insert into PACKAGE
 (
     CATEGORYID, REPOID, PACKAGE, DESCRIPTION, HOMEPAGE, VERSION, V1, V2, V3, V4, V5, V6, SLOT,
-    LICENSE, INSTALLED, OBSOLETED, DOWNLOADSIZE, KEYWORDS, IUSE, MASKED, PUBLISHED, STATUS
+    LICENSE, INSTALLED, OBSOLETED, DOWNLOADSIZE, KEYWORDS, IUSE, MASKED, PUBLISHED, STATUS, SUBSLOT
 )
 values
 (
     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, 0, ?, ?, ?, 0, ?, ?
+    ?, ?, 0, ?, ?, ?, 0, ?, ?, ?
 )
 )EOF");
     query.prepare(sql);
@@ -263,6 +265,18 @@ values
                         status = K9Portage::UNKNOWN;
                     }
 
+                    slot = portage->var("SLOT").toString();
+                    if(slot.contains('/'))
+                    {
+                        int ix = slot.indexOf('/');
+                        subslot = slot.mid(ix + 1);
+                        slot = slot.left(ix);
+                    }
+                    else
+                    {
+                        subslot.clear();
+                    }
+
                     query.bindValue(0, categoryId);
                     query.bindValue(1, repoId);
                     query.bindValue(2, packageName);
@@ -275,7 +289,7 @@ values
                     query.bindValue(9, portage->version.cutNoRevision(3));
                     query.bindValue(10, portage->version.cutNoRevision(4));
                     query.bindValue(11, portage->version.revision());
-                    query.bindValue(12, portage->var("SLOT"));
+                    query.bindValue(12, QVariant(slot));
                     query.bindValue(13, portage->var("LICENSE"));
                     query.bindValue(14, installed);
                     query.bindValue(15, downloadSize);
@@ -283,6 +297,7 @@ values
                     query.bindValue(17, portage->var("IUSE"));
                     query.bindValue(18, published);
                     query.bindValue(19, status);
+                    query.bindValue(20, QVariant(subslot));
                     if(query.exec() == false)
                     {
                         qDebug() << "Query failed:" << query.executedQuery() << query.lastError().text();
@@ -302,12 +317,12 @@ values
 insert into PACKAGE
 (
     CATEGORYID, REPOID, PACKAGE, DESCRIPTION, HOMEPAGE, VERSION, V1, V2, V3, V4, V5, V6,
-    SLOT, LICENSE, INSTALLED, OBSOLETED, DOWNLOADSIZE, KEYWORDS, IUSE, MASKED, PUBLISHED, STATUS
+    SLOT, LICENSE, INSTALLED, OBSOLETED, DOWNLOADSIZE, KEYWORDS, IUSE, MASKED, PUBLISHED, STATUS, SUBSLOT
 )
 values
 (
     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?, 0, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?
 )
 )EOF");
 
@@ -425,6 +440,18 @@ values
                 {
                     query.bindValue(1, repoId);
                 }
+
+                slot = portage->var("SLOT").toString();
+                if(slot.contains('/'))
+                {
+                    int ix = slot.indexOf('/');
+                    subslot = slot.mid(ix + 1);
+                    slot = slot.left(ix);
+                }
+                else
+                {
+                    subslot.clear();
+                }
                 query.bindValue(2, packageName);
                 query.bindValue(3, portage->var("DESCRIPTION"));
                 query.bindValue(4, portage->var("HOMEPAGE"));
@@ -435,7 +462,7 @@ values
                 query.bindValue(9, portage->version.cutNoRevision(3));
                 query.bindValue(10, portage->version.cutNoRevision(4));
                 query.bindValue(11, portage->version.revision());
-                query.bindValue(12, portage->var("SLOT"));
+                query.bindValue(12, QVariant(slot));
                 query.bindValue(13, portage->var("LICENSE"));
                 query.bindValue(14, installed);
                 query.bindValue(15, obsolete);
@@ -444,6 +471,7 @@ values
                 query.bindValue(18, portage->var("IUSE"));
                 query.bindValue(19, published);
                 query.bindValue(20, status);
+                query.bindValue(21, QVariant(subslot));
                 if(query.exec() == false)
                 {
                     qDebug() << "Query failed:" << query.executedQuery() << query.lastError().text();
