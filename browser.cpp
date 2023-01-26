@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -17,7 +17,7 @@
 #include "browser.h"
 #include "browserwindow.h"
 #include "tabwidget.h"
-#include "browserview.h"
+#include "compositeview.h"
 #include "datastorage.h"
 
 #include <unistd.h>
@@ -42,7 +42,7 @@ Browser::Browser(QObject *parent) : QObject(parent)
 
     int windowId;
     BrowserWindow* window;
-    BrowserView* view;
+    CompositeView* view;
     QString url;
     QString title;
     QString icon;
@@ -62,8 +62,15 @@ Browser::Browser(QObject *parent) : QObject(parent)
             w = qwindow.value(3).toInt();
             h = qwindow.value(4).toInt();
 
-            window->setGeometry(x, y, w, h);
-            //window->resize(qwindow.value(3).toInt(), qwindow.value(4).toInt());
+            if(isWayland())
+            {
+                window->resize(w, h);
+            }
+            else
+            {
+                // for some reason, this messes up mapToGlobal() for popup menus on Wayland
+                window->setGeometry(x, y, w, h);
+            }
 
             qry.bindValue(0, windowId);
             if(qry.exec())
@@ -72,26 +79,55 @@ Browser::Browser(QObject *parent) : QObject(parent)
                 currentPage = 0;
                 while(qry.next())
                 {
+                    url = qry.value(0).toString();
+                    title = qry.value(1).toString();
+                    scrollX = qry.value(3).toInt();
+                    scrollY = qry.value(4).toInt();
+                    icon = qry.value(5).toString();
+                    if(icon == ":/img/clipboard.svg")
+                    {
+                        window->clip = true;
+                        window->updateClipButton();
+                        QString app;
+                        QStringList list = url.split(' ');
+                        if(list.first() == "install:")
+                        {
+                            for(int i = 1; i < list.count(); i++)
+                            {
+                                window->install(list.at(i), false);
+                            }
+                        }
+                        else if(list.first() == "uninstall:")
+                        {
+                            for(int i = 1; i < list.count(); i++)
+                            {
+                                window->uninstall(list.at(i));
+                            }
+                        }
+                        url.clear();
+                        page++;
+                        if(qry.value(2).toInt() != 0) // is current page?
+                        {
+                            currentPage = page;
+                        }
+                        continue;
+                    }
+
                     if(page == 0)
                     {
                         view = window->currentView();
                     }
                     else
                     {
-                        view = window->tabWidget()->createTab();
+                        view = window->tabWidget()->createBackgroundTab();
                     }
 
-                    url = qry.value(0).toString();
-                    title = qry.value(1).toString();
-                    scrollX = qry.value(3).toInt();
-                    scrollY = qry.value(4).toInt();
-                    icon = qry.value(5).toString();
                     if(qry.value(2).toInt() != 0) // is current page?
                     {
                         currentPage = page;
                         if(url.isEmpty() == false || title.isEmpty() == false)
                         {
-                            view->delayScroll(scrollX, scrollY);
+                            view->delayScroll(QPoint(scrollX, scrollY));
                             view->navigateTo(url);
                             view->setFocus();
                         }
@@ -109,6 +145,7 @@ Browser::Browser(QObject *parent) : QObject(parent)
                     page++;
                 }
                 window->tabWidget()->setCurrentIndex(currentPage);
+                window->tabWidget()->insertAfter = currentPage;
             }
             window->show();
         }
@@ -158,30 +195,33 @@ void Browser::unixSIGHUP(int unused)
 {
     Q_UNUSED(unused);
     char a = 1;
-    ::write(sighupFd[0], &a, sizeof(a));
+    ssize_t i = ::write(sighupFd[0], &a, sizeof(a));
+    Q_UNUSED(i);
 }
 
 void Browser::unixSIGTERM(int unused)
 {
     Q_UNUSED(unused);
     char a = 1;
-    ::write(sigtermFd[0], &a, sizeof(a));
+    ssize_t i = ::write(sigtermFd[0], &a, sizeof(a));
+    Q_UNUSED(i);
 }
 
 void Browser::handleSIGHUP()
 {
     sighupNotifier->setEnabled(false);
     char tmp;
-    ::read(sighupFd[1], &tmp, sizeof(tmp));
+    ssize_t k = ::read(sighupFd[1], &tmp, sizeof(tmp));
+    Q_UNUSED(k);
 
-    BrowserView* v;
+    CompositeView* v;
     TabWidget* tabs;
     foreach(BrowserWindow* w, windows)
     {
         tabs = w->tabWidget();
         for(int i = 0; i < tabs->count(); i++)
         {
-            v = tabs->tabView(i);
+            v = tabs->viewAt(i);
             if(v->delayLoading)
             {
                 continue;
@@ -189,7 +229,6 @@ void Browser::handleSIGHUP()
 
             if(v->url().startsWith("app:") || v->url().startsWith("update:"))
             {
-                v->saveScrollPosition();
                 v->reload(false);
             }
         }
@@ -202,11 +241,10 @@ void Browser::handleSIGTERM()
 {
     sigtermNotifier->setEnabled(false);
     char tmp;
-    ::read(sigtermFd[1], &tmp, sizeof(tmp));
+    ssize_t i = ::read(sigtermFd[1], &tmp, sizeof(tmp));
+    Q_UNUSED(i);
 
-    qDebug() << "Saving windows/tabs.";
     saveSettings();
-
     sigtermNotifier->setEnabled(true);
 }
 
@@ -268,7 +306,7 @@ void Browser::saveSettings()
     qry.exec("delete from TAB");
     qry.exec("delete from WINDOW");
 
-    BrowserView* view;
+    CompositeView* view;
     qwindow.prepare("insert into WINDOW (WINDOWID, X, Y, W, H) values (?, ?, ?, ?, ?)");
     qry.prepare("insert into TAB (WINDOWID, TABID, URL, TITLE, SCROLLX, SCROLLY, CURRENTPAGE, ICON) values (?, ?, ?, ?, ?, ?, ?, ?)");
 
@@ -300,12 +338,24 @@ void Browser::saveSettings()
         tabCount = window->tabWidget()->count();
         for(int i = 0; i < tabCount; i++)
         {
-            view = window->tabWidget()->tabView(i);
+            view = window->tabWidget()->viewAt(i);
 
             QPoint scroll = view->scrollPosition();
             qry.bindValue(0, windowId);
             qry.bindValue(1, tabId++);
-            qry.bindValue(2, view->url());
+
+            if(view == window->installView)
+            {
+                qry.bindValue(2, "install: " + window->installList.join(' '));
+            }
+            else if(view == window->uninstallView)
+            {
+                qry.bindValue(2, "uninstall: " + window->uninstallList.join(' '));
+            }
+            else
+            {
+                qry.bindValue(2, view->url());
+            }
             qry.bindValue(3, view->title());
             qry.bindValue(4, scroll.x());
             qry.bindValue(5, scroll.y());
