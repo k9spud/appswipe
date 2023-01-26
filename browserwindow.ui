@@ -245,7 +245,7 @@ QScrollBar::add-line:horizontal
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="backButton">
+        <widget class="K9PushButton" name="backButton">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
            <horstretch>0</horstretch>
@@ -277,7 +277,7 @@ QScrollBar::add-line:horizontal
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="forwardButton">
+        <widget class="K9PushButton" name="forwardButton">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
            <horstretch>0</horstretch>
@@ -510,6 +510,11 @@ QScrollBar::add-line:horizontal
    <class>K9LineEdit</class>
    <extends>QLineEdit</extends>
    <header>k9lineedit.h</header>
+  </customwidget>
+  <customwidget>
+   <class>K9PushButton</class>
+   <extends>QPushButton</extends>
+   <header>k9pushbutton.h</header>
   </customwidget>
  </customwidgets>
  <resources>

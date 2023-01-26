@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -17,14 +17,11 @@
 #include "browserwindow.h"
 #include "ui_browserwindow.h"
 #include "globals.h"
-#include "k9portage.h"
 #include "rescanthread.h"
 #include "main.h"
-#include "datastorage.h"
 #include "browser.h"
-#include "browserview.h"
+#include "compositeview.h"
 #include "tabwidget.h"
-#include "k9tabbar.h"
 #include "k9shell.h"
 
 #include <QStringList>
@@ -72,6 +69,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         bool feelingLucky = true;
         QString s = ui->lineEdit->text();
         ui->tabWidget->currentView()->navigateTo(s, true, feelingLucky);
+        ui->tabWidget->currentView()->setFocus();
         ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), ui->tabWidget->currentView()->icon());
     });
     addAction(action);
@@ -176,16 +174,6 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         }
         else
         {
-            if(ui->tabWidget->currentView() == installView)
-            {
-                installList.clear();
-                installView = nullptr;
-            }
-            else if(ui->tabWidget->currentView() == uninstallView)
-            {
-                uninstallList.clear();
-                uninstallView = nullptr;
-            }
             ui->tabWidget->closeTab(ui->tabWidget->currentIndex());
         }
     });
@@ -204,7 +192,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction(tr("&Back"), this);
     action->setShortcuts(shortcuts);
     connect(action, &QAction::triggered, this, &BrowserWindow::back);
-    connect(ui->backButton, &QPushButton::clicked, this, &BrowserWindow::back);
+    connect(ui->backButton, &K9PushButton::clicked, this, &BrowserWindow::back);
     addAction(action);
 
     shortcuts.clear();
@@ -212,68 +200,18 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction(tr("&Forward"), this);
     action->setShortcuts(shortcuts);
     connect(action, &QAction::triggered, this, &BrowserWindow::forward);
-    connect(ui->forwardButton, &QPushButton::clicked, this, &BrowserWindow::forward);
-    addAction(action);
-
-    action = new QAction(tr("&Find"), this);
-    action->setShortcuts(QKeySequence::Find);
-    connect(action, &QAction::triggered, this, [this]()
-    {
-        bool ok = false;
-        QString search = QInputDialog::getText(this, tr("Find"),
-                                               tr("Find:"), QLineEdit::Normal,
-                                               lastSearch, &ok);
-        if(ok && !search.isEmpty())
-        {
-            lastSearch = search;
-            bool found = ui->tabWidget->currentView()->find(lastSearch);
-            if(found == false)
-            {
-                ui->tabWidget->currentView()->setStatus(tr("\"%1\" not found.").arg(lastSearch));
-            }
-        }
-    });
-    addAction(action);
-
-    action = new QAction(tr("Find &Next"), this);
-    action->setShortcut(QKeySequence(Qt::Key_F3));
-    connect(action, &QAction::triggered, [this]()
-    {
-        if(lastSearch.isEmpty() == false)
-        {
-            bool found  = ui->tabWidget->currentView()->find(lastSearch);
-            if(found == false)
-            {
-                ui->tabWidget->currentView()->setStatus(tr("\"%1\" not found.").arg(lastSearch));
-            }
-        }
-    });
-    addAction(action);
-
-    action = new QAction(tr("Find &Previous"), this);
-    action->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F3));
-    connect(action, &QAction::triggered, [this]()
-    {
-        if(lastSearch.isEmpty() == false)
-        {
-            bool found = ui->tabWidget->currentView()->find(lastSearch, QTextDocument::FindBackward);
-            if(found == false)
-            {
-                ui->tabWidget->currentView()->setStatus(tr("\"%1\" not found.").arg(lastSearch));
-            }
-        }
-    });
+    connect(ui->forwardButton, &K9PushButton::clicked, this, &BrowserWindow::forward);
     addAction(action);
 
     connect(ui->tabWidget, &TabWidget::titleChanged, this, [this](const QString& title)
     {
         if(title.isEmpty())
         {
-            setWindowTitle(APP_NAME);
+            setWindowTitle(QString("%1 v%2").arg(APP_NAME).arg(APP_VERSION));
         }
         else
         {
-            setWindowTitle(title + " - " APP_NAME);
+            setWindowTitle(QString("%1 - %2 v%3").arg(title).arg(APP_NAME).arg(APP_VERSION));
         }
     });
 
@@ -282,8 +220,6 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         QString s = url.toDisplayString();
         ui->lineEdit->setText(s);
     });
-
-    connect(ui->tabWidget, &TabWidget::enabledChanged, this, &BrowserWindow::handleEnabledChanged);
 
     action = new QAction(tr("&Stop"), this);
     action->setShortcut(QKeySequence(Qt::Key_Escape));
@@ -301,6 +237,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("News", this);
     connect(action, &QAction::triggered, this, []()
     {
+        // might want to browse /var/db/repos/gentoo/metadata/news/ instead
         QString cmd = "eselect news read";
         shell->externalTerm(cmd, "News");
     });
@@ -409,6 +346,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     addAction(action);
 
     setWorking(false);
+    setWindowTitle(QString("%1 v%2").arg(APP_NAME).arg(APP_VERSION));
     setWindowTitle(APP_NAME);
     updateAskButton();
     updateClipButton();
@@ -429,19 +367,24 @@ TabWidget* BrowserWindow::tabWidget()
     return ui->tabWidget;
 }
 
-BrowserView* BrowserWindow::currentView()
+CompositeView* BrowserWindow::currentView()
 {
     return ui->tabWidget->currentView();
 }
 
+QString BrowserWindow::lineEditText()
+{
+    return ui->lineEdit->text();
+}
+
 void BrowserWindow::back()
 {
-    ui->tabWidget->currentView()->back();
+    ui->tabWidget->back();
 }
 
 void BrowserWindow::forward()
 {
-    ui->tabWidget->currentView()->forward();
+    ui->tabWidget->forward();
 }
 
 void BrowserWindow::on_lineEdit_returnPressed()
@@ -453,6 +396,7 @@ void BrowserWindow::on_lineEdit_returnPressed()
     }
     QString s = ui->lineEdit->text();
     ui->tabWidget->currentView()->navigateTo(s, true, feelingLucky);
+    ui->tabWidget->currentView()->setFocus();
     ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), ui->tabWidget->currentView()->icon());
 }
 
@@ -481,16 +425,16 @@ void BrowserWindow::on_reloadButton_clicked()
     else
     {
         setWorking(true);
-        connect(ui->tabWidget->currentView(), SIGNAL(loadProgress(int)), ui->searchProgress, SLOT(setValue(int)));
+        CompositeView* view = ui->tabWidget->currentView();
+        connect(view, SIGNAL(loadProgress(int)), ui->searchProgress, SLOT(setValue(int)));
 
         bool hardReload = QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ShiftModifier) ||
                           QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ControlModifier);
-        ui->tabWidget->currentView()->saveScrollPosition();
-        ui->tabWidget->currentView()->reload(hardReload);
-
-        disconnect(ui->tabWidget->currentView(), SIGNAL(loadProgress(int)), ui->searchProgress, SLOT(setValue(int)));
+        view->reload(hardReload);
+        ui->lineEdit->setText(view->url());
+        disconnect(view, SIGNAL(loadProgress(int)), ui->searchProgress, SLOT(setValue(int)));
         setWorking(false);
-        ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), ui->tabWidget->currentView()->icon());
+        ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), view->icon());
     }
 }
 
@@ -503,15 +447,15 @@ void BrowserWindow::stop()
     setWorking(false);
 }
 
-void BrowserWindow::handleEnabledChanged(BrowserView::WebAction action, bool enabled)
+void BrowserWindow::enableChanged(History::WebAction action, bool enabled)
 {
     switch (action)
     {
-        case BrowserView::Back:
+        case History::Back:
             ui->backButton->setVisible(enabled);
             break;
 
-        case BrowserView::Forward:
+        case History::Forward:
             ui->forwardButton->setVisible(enabled);
             break;
 
@@ -545,7 +489,7 @@ void BrowserWindow::setWorking(bool workin)
 
 void BrowserWindow::on_newTabButton_clicked()
 {
-    ui->tabWidget->createTab();
+    ui->tabWidget->createEmptyTab();
     ui->lineEdit->clear();
     ui->lineEdit->setFocus();
 }
@@ -560,6 +504,28 @@ void BrowserWindow::on_clipButton_clicked()
 {
     clip = !clip;
     updateClipButton();
+}
+
+void BrowserWindow::on_backButton_longPressed()
+{
+    QMenu* menu = tabWidget()->backMenu();
+    if(menu != nullptr)
+    {
+        QPoint point = mapToGlobal(ui->backButton->pos());
+        QPoint p(point.x(), point.y() + ui->backButton->height());
+        menu->exec(p);
+    }
+}
+
+void BrowserWindow::on_forwardButton_longPressed()
+{
+    QMenu* menu = tabWidget()->forwardMenu();
+    if(menu != nullptr)
+    {
+        QPoint point = mapToGlobal(ui->forwardButton->pos());
+        QPoint p(point.x(), point.y() + ui->forwardButton->height());
+        menu->exec(p);
+    }
 }
 
 void BrowserWindow::updateAskButton()
@@ -608,7 +574,7 @@ void BrowserWindow::exec(QString cmd)
 
 void BrowserWindow::exec(QString cmd, QString title)
 {
-    if(clip)
+    if(clip && (title.endsWith("install") || title.endsWith("uninstall")))
     {
         QClipboard* clip = qApp->clipboard();
         clip->setText(cmd);
@@ -628,19 +594,34 @@ void BrowserWindow::install(QString atom, bool isWorld)
 
     if(installView == nullptr)
     {
-        installView = ui->tabWidget->createBrowserView();
-        installView->setIcon(":/img/clipboard.svg");
+        installView = ui->tabWidget->createTab();
+
+        History::State state;
+        state.pos = QPoint(0, 0);
+        state.target = "";
+        state.title = "Apps to Install...";
+        installView->history->appendHistory(state);
+    }
+    else
+    {
+        ui->tabWidget->setCurrentWidget(installView);
     }
 
-    installList.append(atom);
-    installView->clear();
+    if(installList.contains(atom) == false)
+    {
+        installList.append(atom);
+    }
+
+    ui->lineEdit->clear();
+    installView->browser()->clear();
+    installView->setIcon(":/img/clipboard.svg");
     QString cmd = "sudo emerge";
     foreach(atom, installList)
     {
         cmd.append(QString(" =%1").arg(atom));
     }
     cmd.append(" --newuse --verbose --verbose-conflicts --nospinner");
-    if(isWorld == false)
+    if(isWorld == false || installList.count() > 1)
     {
         cmd.append(" --oneshot");
     }
@@ -650,6 +631,7 @@ void BrowserWindow::install(QString atom, bool isWorld)
         cmd.append(" --ask");
     }
     installView->setText(cmd);
+    installView->setTitle("Apps to Install...");
 }
 
 void BrowserWindow::uninstall(QString atom)
@@ -661,13 +643,26 @@ void BrowserWindow::uninstall(QString atom)
 
     if(uninstallView == nullptr)
     {
-        int insertAfter = ui->tabWidget->currentIndex();
-        uninstallView = ui->tabWidget->createBackgroundTab(insertAfter);
-        uninstallView->setIcon(":/img/clipboard.svg");
+        uninstallView = ui->tabWidget->createTab();
+
+        History::State state;
+        state.pos = QPoint(0, 0);
+        state.target = "";
+        state.title = "Apps to Uninstall...";
+        uninstallView->history->appendHistory(state);
+    }
+    else
+    {
+        ui->tabWidget->setCurrentWidget(uninstallView);
     }
 
-    uninstallList.append(atom);
-    uninstallView->clear();
+    if(uninstallList.contains(atom) == false)
+    {
+        uninstallList.append(atom);
+    }
+    ui->lineEdit->clear();
+    uninstallView->browser()->clear();
+    uninstallView->setIcon(":/img/clipboard.svg");
     QString cmd = "sudo emerge --unmerge";
     foreach(atom, uninstallList)
     {
@@ -679,6 +674,7 @@ void BrowserWindow::uninstall(QString atom)
         cmd.append(" --ask");
     }
     uninstallView->setText(cmd);
+    uninstallView->setTitle("Apps to Uninstall...");
 }
 
 BrowserWindow* BrowserWindow::openWindow()
@@ -719,24 +715,26 @@ void BrowserWindow::reloadDatabaseComplete()
 void BrowserWindow::viewUpdates()
 {
     QString s = "update:";
-    ui->lineEdit->setText(s);
 
-    BrowserView* view;
+    CompositeView* view;
     for(int i = 0; i < ui->tabWidget->count(); i++)
     {
-        view = ui->tabWidget->tabView(i);
+        view = ui->tabWidget->viewAt(i);
         if(view->url() == s)
         {
             ui->tabWidget->setCurrentIndex(i);
             ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), ui->tabWidget->currentView()->icon());
+            ui->lineEdit->setText(s);
             return;
         }
     }
 
     // couldn't find an already open tab with available updates, so open a new tab instead:
-    ui->tabWidget->createTab();
-    ui->tabWidget->currentView()->navigateTo(s, true);
-    ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), ui->tabWidget->currentView()->icon());
+    view = ui->tabWidget->createTab();
+    view->navigateTo(s, true);
+    view->setFocus();
+    ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), view->icon());
+    ui->lineEdit->setText(s);
 }
 
 void BrowserWindow::switchToTab(int index)
@@ -823,3 +821,4 @@ void BrowserWindow::keyPressEvent(QKeyEvent* event)
             break;
     }
 }
+

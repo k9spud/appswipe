@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2021-2022, K9spud LLC.
+﻿// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -17,7 +17,7 @@
 #ifndef BROWSERWINDOW_H
 #define BROWSERWINDOW_H
 
-#include "browserview.h"
+#include "history.h"
 
 #include <QMainWindow>
 
@@ -29,6 +29,7 @@ class QMenu;
 class RescanThread;
 class Browser;
 class BrowserView;
+class CompositeView;
 class TabWidget;
 class BrowserWindow : public QMainWindow
 {
@@ -43,11 +44,15 @@ public:
     bool clip;
     bool ask;
 
+    CompositeView* installView;
+    CompositeView* uninstallView;
     QStringList installList;
     QStringList uninstallList;
 
     TabWidget* tabWidget();
-    BrowserView* currentView();
+    CompositeView* currentView();
+
+    QString lineEditText();
 
 public slots:
     void updateAskButton();
@@ -62,12 +67,13 @@ public slots:
     void reloadDatabaseComplete();
     void viewUpdates();
     void switchToTab(int index);
+    void enableChanged(History::WebAction action, bool enabled);
 
 protected slots:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
-    virtual void keyPressEvent(QKeyEvent *event);
+    virtual void keyPressEvent(QKeyEvent *event) override;
 
 private slots:
     void on_menuButton_pressed();
@@ -77,12 +83,14 @@ private slots:
     void back();
     void forward();
     void stop();
-    void handleEnabledChanged(BrowserView::WebAction action, bool enabled);
 
     void on_newTabButton_clicked();
     void on_reloadButton_clicked();
     void on_askButton_clicked();
     void on_clipButton_clicked();
+
+    void on_backButton_longPressed();
+    void on_forwardButton_longPressed();
 
 private:
     Ui::BrowserWindow *ui;
@@ -92,8 +100,5 @@ private:
     void setWorking(bool workin);
     bool working;
     QString lastSearch;
-
-    BrowserView* installView;
-    BrowserView* uninstallView;
 };
 #endif // BROWSERWINDOW_H
