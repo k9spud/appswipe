@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -187,6 +187,7 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
     QString version;
     QString repo;
     QString slot;
+    QString subslot;
 
     foreach(s, lines)
     {
@@ -383,6 +384,16 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
             package.replace("*", "%");
             slot = match.captured(3);
             slot.replace("*", "%");
+            if(slot.contains('/'))
+            {
+                int ix = slot.indexOf('/');
+                subslot = slot.mid(ix + 1);
+                slot = slot.left(ix);
+            }
+            else
+            {
+                subslot = "%";
+            }
 
             if(category != "%")
             {
@@ -430,6 +441,23 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
                 }
             }
 
+            if(subslot != "%")
+            {
+                if(clauses.isEmpty() == false)
+                {
+                    clauses.append(" and ");
+                }
+
+                if(subslot.contains("%"))
+                {
+                    clauses.append("SUBSLOT like ?");
+                }
+                else
+                {
+                    clauses.append("SUBSLOT=?");
+                }
+            }
+
             if(clauses.isEmpty())
             {
                 qDebug() << "Empty WHERE clause for:" << s;
@@ -447,10 +475,14 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
                 query.addBindValue(package);
             }
 
-
             if(slot != "%")
             {
                 query.addBindValue(slot);
+            }
+
+            if(subslot != "%")
+            {
+                query.addBindValue(subslot);
             }
 
             if(query.exec() == false)
@@ -474,6 +506,17 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
             version.replace("*", "%");
             slot = match.captured(5);
             slot.replace("*", "%");
+            if(slot.contains('/'))
+            {
+                int ix = slot.indexOf('/');
+                subslot = slot.mid(ix + 1);
+                slot = slot.left(ix);
+            }
+            else
+            {
+                subslot = "%";
+            }
+
             repo = match.captured(6);
             repo.replace("*", "%");
 
@@ -494,6 +537,23 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
                     else
                     {
                         clauses.append("SLOT=?");
+                    }
+                }
+
+                if(subslot != "%" && slot.isEmpty() == false)
+                {
+                    if(clauses.isEmpty() == false)
+                    {
+                        clauses.append(" and ");
+                    }
+
+                    if(subslot.contains("%"))
+                    {
+                        clauses.append("SUBSLOT like ?");
+                    }
+                    else
+                    {
+                        clauses.append("SUBSLOT=?");
                     }
                 }
 
@@ -541,6 +601,11 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
                     query.addBindValue(slot);
                 }
 
+                if(subslot != "%" && subslot.isEmpty() == false)
+                {
+                    query.addBindValue(subslot);
+                }
+
                 if(repo != "%" && repo.isEmpty() == false)
                 {
                     query.addBindValue(repo);
@@ -571,6 +636,23 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
                     else
                     {
                         clauses.append("SLOT=?");
+                    }
+                }
+
+                if(subslot != "%" && subslot.isEmpty() == false)
+                {
+                    if(clauses.isEmpty() == false)
+                    {
+                        clauses.append(" and ");
+                    }
+
+                    if(subslot.contains("%"))
+                    {
+                        clauses.append("SUBSLOT like ?");
+                    }
+                    else
+                    {
+                        clauses.append("SUBSLOT=?");
                     }
                 }
 
@@ -611,6 +693,11 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
                 if(slot != "%" && slot.isEmpty() == false)
                 {
                     query.addBindValue(slot);
+                }
+
+                if(subslot != "%" && subslot.isEmpty() == false)
+                {
+                    query.addBindValue(subslot);
                 }
 
                 if(repo != "%" && repo.isEmpty() == false)
