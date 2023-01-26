@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,9 +30,8 @@ K9Shell::K9Shell(QObject *parent) : QProcess(parent)
 void K9Shell::externalBrowser(QString url)
 {
     QStringList args;
-    args << "--launch" << "WebBrowser";
-    args << url;
-    startDetached("/usr/bin/exo-open", args);
+    args << "open" << url;
+    startDetached("/usr/bin/gio", args);
 }
 
 void K9Shell::externalTerm(QString cmd)
@@ -105,8 +104,6 @@ void K9Shell::externalTerm(QString script, QString title, bool waitSuccessful)
     tmp->close();
 
     QStringList term;
-//    term << "-T" << cmd << "-x" << "/bin/bash" << tmp->fileName();
-//    startDetached("/usr/bin/xfce4-terminal", term);
     term << "-T" << title << "-e" << "/bin/bash" << tmp->fileName();
     startDetached("/usr/bin/lxterminal", term);
 }
@@ -114,7 +111,6 @@ void K9Shell::externalTerm(QString script, QString title, bool waitSuccessful)
 void K9Shell::externalFileManager(QString url)
 {
     QStringList args;
-    args << "--launch" << "FileManager";
-    args << url;
-    startDetached("/usr/bin/exo-open", args);
+    args << "open" << url;
+    startDetached("/usr/bin/gio", args);
 }

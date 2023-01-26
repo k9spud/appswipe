@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -17,10 +17,10 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define APP_VERSION "1.1.21"
-#define APP_NAME "App Swipe v" APP_VERSION
-#define APP_COPYRIGHT "Copyright (c) 2021-2022, K9spud LLC"
-#define APP_HTMLCOPYRIGHT "Copyright &copy; 2021-2022, K9spud LLC"
+#define APP_VERSION "1.1.34"
+#define APP_NAME "App Swipe"
+#define APP_COPYRIGHT "Copyright (c) 2021-2023, K9spud LLC"
+#define APP_HTMLCOPYRIGHT "Copyright &copy; 2021-2023, K9spud LLC"
 #define APP_FOLDER ".AppSwipe"
 
 #endif // MAIN_H
