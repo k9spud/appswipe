@@ -27,5 +27,7 @@
         <file>img/xfce.svg</file>
         <file>img/mail.svg</file>
         <file>img/new.svg</file>
+        <file>img/folder.svg</file>
+        <file>img/document.svg</file>
     </qresource>
 </RCC>
