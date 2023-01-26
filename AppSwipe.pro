@@ -12,10 +12,14 @@ SOURCES += \
     browser.cpp \
     browserview.cpp \
     browserwindow.cpp \
+    compositeview.cpp \
     datastorage.cpp \
     globals.cpp \
+    history.cpp \
+    imageview.cpp \
     k9lineedit.cpp \
     k9portage.cpp \
+    k9pushbutton.cpp \
     k9shell.cpp \
     k9tabbar.cpp \
     main.cpp \
@@ -27,10 +31,14 @@ HEADERS += \
     browser.h \
     browserview.h \
     browserwindow.h \
+    compositeview.h \
     datastorage.h \
     globals.h \
+    history.h \
+    imageview.h \
     k9lineedit.h \
     k9portage.h \
+    k9pushbutton.h \
     k9shell.h \
     k9tabbar.h \
     main.h \
