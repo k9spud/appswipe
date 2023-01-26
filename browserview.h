@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -17,6 +17,8 @@
 #ifndef BROWSERVIEW_H
 #define BROWSERVIEW_H
 
+#include "history.h"
+
 #include <QTextEdit>
 #include <QStringList>
 
@@ -27,13 +29,14 @@
 #include <QIcon>
 #include <QPointF>
 #include <QTimer>
+#include <QProcess>
 
 class QLabel;
-class QProgressBar;
 class QMenu;
 class QContextMenuEvent;
 class QSqlQuery;
 class BrowserWindow;
+class CompositeView;
 class BrowserView : public QTextEdit
 {
     Q_OBJECT
@@ -41,77 +44,52 @@ public:
     explicit BrowserView(QWidget *parent = nullptr);
     QMenu* createStandardContextMenu(const QPoint &position);
 
-    void appendHistory(QString text, int scrollX, int scrollY);
-    struct History
-    {
-        QString target;
-        int scrollX;
-        int scrollY;
-    };
-    QVector<History> history;
-    int currentHistory;
-    QString url();
-    QString title() const;
+    QString currentUrl;
     QPoint scrollPosition();
-    void setScrollPosition(int x, int y);
-    void saveScrollPosition();
-    QIcon icon();
-    void setIcon(QString fileName);
-    QIcon siteIcon;
-    QString iconFileName;
+    void setScrollPosition(const QPoint& pos);
+    QPoint saveScrollPosition();
 
-    void load();
-    void delayLoad(QString url, QString title, int scrollX, int scrollY);
-    void delayScroll(int scrollX, int scrollY);
-    bool delayLoading;
-    bool delayScrolling;
-    int delayScrollX, delayScrollY;
+    CompositeView* composite;
 
-    BrowserWindow* window;
+    bool find(const QString &text, QTextDocument::FindFlags options = QTextDocument::FindFlags());
 
-    void resizeStatusBar();
-
-    enum WebAction {
-        NoWebAction = - 1,
-        Back,
-        Forward,
-        Stop,
-        Reload
-    };
+    QString appNoVersion(QString app);
+    QString appVersion(QString app);
 
 signals:
     void urlChanged(const QUrl& url);
     void titleChanged(const QString& title);
-    void iconChanged(const QIcon &icon);
-    void enabledChanged(WebAction action, bool enabled);
-    void loadStarted();
     void loadProgress(int percent);
-    void loadFinished(bool ok);
+    void loadFinished();
     void openInNewTab(const QString& url);
 
+    void appendHistory(const History::State& state);
+    void updateState(const History::State& state);
+
 public slots:
-    void setProgress(int progress);
-    void setStatus(QString text);
     void navigateTo(QString text, bool changeHistory = true, bool feelingLucky = false);
+    void jumpTo(const History::State& s);
     void setUrl(const QUrl& url);
     void error(QString text);
-    void back();
-    void forward();
     void reload(bool hardReload = true);
-    void stop();
 
     void about();
     void reloadingDatabase();
     void viewFile(QString fileName);
+    void viewFolder(QString folderPath);
     void viewApp(const QUrl& url);
+    void viewAppFiles(const QUrl& url);
     void viewUpdates(QString action);
     void reloadApp(const QUrl& url);
     void searchApps(QString search, bool feelingLucky = false);
     void whatsNew(QString search, bool feelingLucky = false);
-    void checkEnables(void);
 
 protected slots:
     void swipeUpdate(void);
+
+    void processFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void processReadStandardError();
+    void processReadStandardOutput();
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
@@ -125,27 +103,24 @@ protected:
     int dy;
     QTimer animationTimer;
 
-    virtual void keyPressEvent(QKeyEvent *event);
+    virtual void keyPressEvent(QKeyEvent *event) override;
 
     virtual void contextMenuEvent(QContextMenuEvent *event) override;
-    virtual void resizeEvent(QResizeEvent* event);
 
     QHash<QString, QString> iconMap;    // category type, icon resource file name
 
-    QString delayUrl;
-    QString delayTitle;
-
+    QString lastSearch;
     QString oldLink;
-    QLabel* status;
-    QProgressBar* progress;
     QString context;
     bool isWorld;
 
-    void fetchUpdates(QSqlQuery* query, QString search);
-    void showUpdates(QSqlQuery* query, QString header, QString search);
+    void fetchUpdates(QSqlQuery* query);
+    void showUpdates(QSqlQuery* query, QString header);
     void showQueryResult(QSqlQuery* query, QString header, QString search, bool feelingLucky = false);
     void printApp(QString& result, QString& app, QString& description, QString& latestVersion, QStringList& installedVersions, QStringList& obsoletedVersions);
     QString findAppIcon(bool& hasIcon, QString category, QString package, QString version);
+
+    QProcess* process;
 };
 
 #endif // BROWSERVIEW_H
