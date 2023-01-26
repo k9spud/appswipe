@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,6 +18,8 @@
 #include "k9tabbar.h"
 #include "browserview.h"
 #include "browserwindow.h"
+#include "history.h"
+#include "compositeview.h"
 
 #include <QIcon>
 #include <QPixmap>
@@ -27,6 +29,9 @@
 TabWidget::TabWidget(QWidget *parent) : QTabWidget(parent)
 {
     window = nullptr;
+    oldIndex = -1;
+    oldView = nullptr;
+    insertAfter = -1;
 
     tabbar = new K9TabBar(this);
     setTabBar(tabbar);
@@ -49,22 +54,22 @@ TabWidget::TabWidget(QWidget *parent) : QTabWidget(parent)
     connect(this, &QTabWidget::currentChanged, this, &TabWidget::currentTabChanged);
 }
 
-BrowserView* TabWidget::currentView()
+CompositeView* TabWidget::currentView()
 {
     int index = currentIndex();
-    if(index >= 0)
+    if(index >= 0 && index < count())
     {
-        return tabView(index);
+        return qobject_cast<CompositeView*>(widget(index));
     }
 
     return createTab();
 }
 
-BrowserView* TabWidget::tabView(int index)
+CompositeView* TabWidget::viewAt(int index)
 {
     if(index >= 0 && index < count())
     {
-        BrowserView* view = qobject_cast<BrowserView*>(widget(index));
+        CompositeView* view = qobject_cast<CompositeView*>(widget(index));
         if(view != nullptr)
         {
             return view;
@@ -77,7 +82,7 @@ BrowserView* TabWidget::tabView(int index)
 void TabWidget::setTabIcon(int index, const QIcon& icon)
 {
     QIcon::Mode mode = QIcon::Normal;
-    BrowserView* view = tabView(index);
+    CompositeView* view = qobject_cast<CompositeView*>(widget(index));
     if(view != nullptr)
     {
         if(view->delayLoading)
@@ -108,9 +113,46 @@ void TabWidget::setTabIcon(int index, const QIcon& icon)
     QTabWidget::setTabIcon(index, roticon);
 }
 
-BrowserView* TabWidget::createTab()
+void TabWidget::forward()
 {
-    BrowserView* view = createBackgroundTab();
+    currentView()->forward();
+}
+
+void TabWidget::back()
+{
+    currentView()->back();
+}
+
+QMenu* TabWidget::forwardMenu()
+{
+    CompositeView* view = currentView();
+    if(view == nullptr)
+    {
+        return nullptr;
+    }
+    return view->history->forwardMenu();
+}
+
+QMenu* TabWidget::backMenu()
+{
+    CompositeView* view = currentView();
+    if(view == nullptr)
+    {
+        return nullptr;
+    }
+    return view->history->backMenu();
+}
+
+CompositeView* TabWidget::createTab()
+{
+    CompositeView* view = createBackgroundTab();
+    setCurrentWidget(view);
+    return view;
+}
+
+CompositeView* TabWidget::createEmptyTab()
+{
+    CompositeView* view = createBackgroundTab();
     setCurrentWidget(view);
     return view;
 }
@@ -120,7 +162,7 @@ void TabWidget::openInNewTab(const QString& url)
     K9TabBar* tb = qobject_cast<K9TabBar*>(tabBar());
     QRect before = tb->tabRect(0);
 
-    BrowserView* view = createBackgroundTab();
+    CompositeView* view = createBackgroundTab();
 
     QRect after = tb->tabRect(0);
     if(before.y() < after.y())
@@ -150,9 +192,9 @@ void TabWidget::openInNewTab(const QString& url)
     }
 }
 
-BrowserView* TabWidget::createBackgroundTab(int insertIndex)
+CompositeView* TabWidget::createBackgroundTab(int insertIndex)
 {
-    BrowserView* view = createBrowserView();
+    CompositeView* view = createView();
 
     int index;
     if(insertIndex == -1)
@@ -169,25 +211,16 @@ BrowserView* TabWidget::createBackgroundTab(int insertIndex)
         index = addTab(view, "");
     }
     setTabIcon(index, view->icon());
-
     return view;
 }
 
-BrowserView* TabWidget::createBrowserView()
+CompositeView* TabWidget::createView()
 {
-    BrowserView* view = new BrowserView();
+    CompositeView* view = new CompositeView();
     view->window = window;
 
-    connect(view, &BrowserView::enabledChanged, [this, view](BrowserView::WebAction action, bool enabled)
-    {
-        if(currentIndex() == indexOf(view))
-        {
-            emit enabledChanged(action, enabled);
-        }
-    });
-
-    connect(view, &BrowserView::openInNewTab, this, &TabWidget::openInNewTab);
-    connect(view, &BrowserView::titleChanged, [this, view](const QString& title)
+    connect(view, &CompositeView::openInNewTab, this, &TabWidget::openInNewTab);
+    connect(view, &CompositeView::titleChanged, [this, view](const QString& title)
     {
         int index = indexOf(view);
         if(index >= 0)
@@ -201,7 +234,7 @@ BrowserView* TabWidget::createBrowserView()
         }
     });
 
-    connect(view, &BrowserView::urlChanged, [this, view](const QUrl& url)
+    connect(view, &CompositeView::urlChanged, [this, view](const QUrl& url)
     {
         int index = indexOf(view);
         if(index >= 0)
@@ -215,7 +248,7 @@ BrowserView* TabWidget::createBrowserView()
         }
     });
 
-    connect(view, &BrowserView::iconChanged, [this, view](QIcon icon)
+    connect(view, &CompositeView::iconChanged, [this, view](QIcon icon)
     {
         if(currentView() == view)
         {
@@ -238,64 +271,75 @@ BrowserView* TabWidget::createBrowserView()
 
 void TabWidget::closeTab(int index)
 {
-    BrowserView* view = tabView(index);
-    if(view != nullptr)
+    QWidget* w = widget(index);
+    if(w == nullptr)
     {
-        bool hasFocus = view->hasFocus();
-        K9TabBar* tb = qobject_cast<K9TabBar*>(tabBar());
-        QRect before = tb->tabRect(0);
-        int nextTab = currentIndex();
+        return; // no tab widget, nothing to do.
+    }
 
-        if(index == nextTab)
+    CompositeView* view = qobject_cast<CompositeView*>(w);
+    if(view == window->installView)
+    {
+        window->installList.clear();
+        window->installView = nullptr;
+    }
+    else if(view == window->uninstallView)
+    {
+        window->uninstallList.clear();
+        window->uninstallView = nullptr;
+    }
+
+    bool hasFocus = view->hasFocus();
+    K9TabBar* tb = qobject_cast<K9TabBar*>(tabBar());
+    QRect before = tb->tabRect(0);
+    int nextTab = currentIndex();
+
+    if(index == nextTab)
+    {
+        oldIndex = -1;
+        nextTab++;
+        if(nextTab > count())
         {
-            nextTab++;
-            if(nextTab > count())
-            {
-                nextTab = index - 1;
-            }
-
-            if(nextTab < 0)
-            {
-                nextTab = 0;
-            }
+            nextTab = index - 1;
         }
 
-        removeTab(index);
-        if(count() == 0)
+        if(nextTab < 0)
         {
-            createTab();
+            nextTab = 0;
         }
+    }
 
-        QRect after = tb->tabRect(0);
-        if(before.y() < after.y())
-        {
-            int ticks = (after.y() - before.y()) / after.height() + 1;
-            tb->scrollDown(ticks);
-            after = tb->tabRect(0);
-            if(before.y() > after.y())
-            {
-                tb->scrollUp();
-            }
-        }
-        else if(before.y() > after.y())
-        {
-            int ticks = (before.y() - after.y()) / after.height() + 1;
-            tb->scrollUp(ticks);
-            after = tb->tabRect(0);
-            if(before.y() < after.y())
-            {
-                tb->scrollDown();
-            }
-        }
-
-        //setCurrentIndex(currentIndex());
-        
+    removeTab(index);
+    if(count() == 0)
+    {
+        CompositeView* newView = createTab();
         if(hasFocus && count() > 0)
         {
-            view->setFocus();
+            newView->setFocus();
         }
+    }
+    view->deleteLater();
 
-        view->deleteLater();
+    QRect after = tb->tabRect(0);
+    if(before.y() < after.y())
+    {
+        int ticks = (after.y() - before.y()) / after.height() + 1;
+        tb->scrollDown(ticks);
+        after = tb->tabRect(0);
+        if(before.y() > after.y())
+        {
+            tb->scrollUp();
+        }
+    }
+    else if(before.y() > after.y())
+    {
+        int ticks = (before.y() - after.y()) / after.height() + 1;
+        tb->scrollUp(ticks);
+        after = tb->tabRect(0);
+        if(before.y() < after.y())
+        {
+            tb->scrollDown();
+        }
     }
 }
 
@@ -311,20 +355,39 @@ void TabWidget::closeAll()
 
 void TabWidget::currentTabChanged(int index)
 {
+    CompositeView* view;
+
     tabbar->showTabLabel(-1);
+
+    if(oldIndex >= 0 && oldIndex < count())
+    {
+        view = qobject_cast<CompositeView*>(widget(oldIndex));
+        if(view != nullptr && view == oldView)
+        {
+            History::State state;
+            state.target= window->lineEditText();
+            state.title = view->title();
+            state.pos = view->scrollPosition();
+            view->history->updateState(state);
+            disconnect(view->history, &History::enableChanged, window, &BrowserWindow::enableChanged);
+            disconnect(view->history, &History::stateChanged, view, &CompositeView::stateChanged);
+        }
+    }
+    oldIndex = index;
+    oldView = qobject_cast<CompositeView*>(widget(index));
 
     if(index == -1)
     {
         emit titleChanged(QString());
         emit urlChanged(QUrl());
-        emit enabledChanged(BrowserView::Back, false);
-        emit enabledChanged(BrowserView::Forward, false);
+        emit enableChanged(History::Back, false);
+        emit enableChanged(History::Forward, false);
         return;
     }
 
     insertAfter = index;
 
-    BrowserView* view = tabView(index);
+    view = qobject_cast<CompositeView*>(widget(index));
     if(view == nullptr)
     {
         return;
@@ -344,7 +407,10 @@ void TabWidget::currentTabChanged(int index)
         view->setFocus();
     }
 
-    emit titleChanged(view->documentTitle());
+    connect(view->history, &History::enableChanged, window, &BrowserWindow::enableChanged);
+    connect(view->history, &History::stateChanged, view, &CompositeView::stateChanged);
+
+    emit titleChanged(view->title());
     emit urlChanged(view->url());
-    view->checkEnables();
+    view->history->checkEnables();
 }

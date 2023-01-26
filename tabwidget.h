@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,12 +18,15 @@
 #define TABWIDGET_H
 
 #include "browserview.h"
+#include "history.h"
 
 #include <QWidget>
 #include <QTabWidget>
+#include <QVector>
 
 class K9TabBar;
 class BrowserView;
+class CompositeView;
 class BrowserWindow;
 class TabWidget : public QTabWidget
 {
@@ -34,17 +37,24 @@ public:
 
     BrowserWindow* window;
 
-    BrowserView* currentView();
-    BrowserView* tabView(int index);
+    CompositeView* currentView();
+    CompositeView* viewAt(int index);
 
     virtual void setTabIcon(int index, const QIcon& icon);
 
     int insertAfter;
 
+    void forward();
+    void back();
+
+    QMenu* forwardMenu();
+    QMenu* backMenu();
+
 public slots:
-    BrowserView* createTab();
-    BrowserView* createBackgroundTab(int insertIndex = -1);
-    BrowserView* createBrowserView();
+    CompositeView* createTab();
+    CompositeView* createEmptyTab();
+    CompositeView* createBackgroundTab(int insertIndex = -1);
+    CompositeView* createView();
     void openInNewTab(const QString& url);
     void closeTab(int index);
     void closeAll();
@@ -53,14 +63,15 @@ signals:
     void urlChanged(const QUrl& url);
     void titleChanged(const QString& title);
 
-    void enabledChanged(BrowserView::WebAction action, bool enabled);
+    void enableChanged(History::WebAction action, bool enabled);
 
 private slots:
     void currentTabChanged(int index);
 
 private:
     K9TabBar* tabbar;
-
+    int oldIndex;
+    CompositeView* oldView;
 };
 
 #endif // TABWIDGET_H
