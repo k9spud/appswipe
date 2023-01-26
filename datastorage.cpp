@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2022, K9spud LLC.
+// Copyright (c) 2021-2023, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -183,7 +183,7 @@ QString DataStorage::openDatabase()
             schemaVersion = query.value(0).toInt();
         }
 
-        if(schemaVersion < 2)
+        if(schemaVersion < 3)
         {
             upgradeDatabase(query, db, schemaVersion);
         }
@@ -219,7 +219,7 @@ bool DataStorage::upgradeDatabase(QSqlQuery& query, QSqlDatabase& db, int schema
 
     db.transaction();
 
-    if(schemaVersion < 2)
+    if(schemaVersion < 3)
     {
         if(query.exec("drop table PACKAGE") == false)
         {
@@ -237,7 +237,7 @@ bool DataStorage::upgradeDatabase(QSqlQuery& query, QSqlDatabase& db, int schema
         return false;
     }
 
-    int finalVersion = 2;
+    int finalVersion = 3;
     query.prepare("update META set UUID=ifnull(UUID,?), SCHEMAVERSION=?");
     query.bindValue(0, QUuid::createUuid().toString(QUuid::WithoutBraces));
     query.bindValue(1, finalVersion);
