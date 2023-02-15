@@ -19,8 +19,6 @@
 #include "k9portage.h"
 #include "browser.h"
 #include "browserwindow.h"
-#include "tabwidget.h"
-#include "browserview.h"
 #include "datastorage.h"
 #include "k9shell.h"
 #include "rescanthread.h"
@@ -135,16 +133,18 @@ int main(int argc, char *argv[])
 
     shell = new K9Shell();
 
-    Browser browser;
+    browser = new Browser();
     BrowserWindow* window = nullptr;
-    if(browser.windows.count() == 0)
+
+    browser->restoreWindows();
+    if(browser->windows.count() == 0)
     {
-        window = browser.createWindow();
+        window = browser->createWindow();
         window->show();
     }
     else
     {
-        window = browser.windows.first();
+        window = browser->windows.first();
     }
     if(window != nullptr)
     {
@@ -155,5 +155,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    return app->exec();
+    int retCode = app->exec();
+    delete browser;
+    browser = nullptr;
+
+    return retCode;
 }
