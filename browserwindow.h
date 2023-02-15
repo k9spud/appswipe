@@ -20,14 +20,15 @@
 #include "history.h"
 
 #include <QMainWindow>
+#include <QSize>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class BrowserWindow; }
 QT_END_NAMESPACE
 
 class QMenu;
+class QResizeEvent;
 class RescanThread;
-class Browser;
 class BrowserView;
 class CompositeView;
 class TabWidget;
@@ -39,10 +40,11 @@ public:
     BrowserWindow(QWidget* parent = nullptr);
     ~BrowserWindow();
 
-    Browser* browser;
-
+    int windowId;
     bool clip;
     bool ask;
+
+    QSize unmaximizedSize;
 
     CompositeView* installView;
     CompositeView* uninstallView;
@@ -73,7 +75,11 @@ protected slots:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    virtual void resizeEvent(QResizeEvent* event) override;
     virtual void keyPressEvent(QKeyEvent *event) override;
+
+    virtual void dragEnterEvent(QDragEnterEvent *event) override;
+    virtual void dropEvent(QDropEvent *event) override;
 
 private slots:
     void on_menuButton_pressed();
@@ -85,6 +91,7 @@ private slots:
     void stop();
 
     void on_newTabButton_clicked();
+    void on_newTabButton_longPressed();
     void on_reloadButton_clicked();
     void on_askButton_clicked();
     void on_clipButton_clicked();
@@ -96,6 +103,8 @@ private:
     Ui::BrowserWindow *ui;
 
     QMenu* menu;
+    QMenu* tabsMenu;
+    QMenu* inactiveWindows;
 
     void setWorking(bool workin);
     bool working;

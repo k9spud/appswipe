@@ -19,6 +19,7 @@
 #include "tabwidget.h"
 #include "compositeview.h"
 #include "datastorage.h"
+#include "globals.h"
 
 #include <unistd.h>
 #include <sys/socket.h>
@@ -35,122 +36,6 @@ int sigtermFd[2];
 
 Browser::Browser(QObject *parent) : QObject(parent)
 {
-    QSqlDatabase db = QSqlDatabase::database(ds->connectionName);
-    QSqlQuery qry(db);
-    QSqlQuery qwindow(db);
-    qry.prepare("select URL, TITLE, CURRENTPAGE, SCROLLX, SCROLLY, ICON from TAB where WINDOWID=? order by TABID");
-
-    int windowId;
-    BrowserWindow* window;
-    CompositeView* view;
-    QString url;
-    QString title;
-    QString icon;
-    int scrollX, scrollY;
-    int currentPage;
-    int page;
-
-    int x, y, w, h;
-    if(qwindow.exec("select WINDOWID, X, Y, W, H from WINDOW order by WINDOWID"))
-    {
-        while(qwindow.next())
-        {
-            windowId = qwindow.value(0).toInt();
-            window = createWindow();
-            x = qwindow.value(1).toInt();
-            y = qwindow.value(2).toInt();
-            w = qwindow.value(3).toInt();
-            h = qwindow.value(4).toInt();
-
-            if(isWayland())
-            {
-                window->resize(w, h);
-            }
-            else
-            {
-                // for some reason, this messes up mapToGlobal() for popup menus on Wayland
-                window->setGeometry(x, y, w, h);
-            }
-
-            qry.bindValue(0, windowId);
-            if(qry.exec())
-            {
-                page = 0;
-                currentPage = 0;
-                while(qry.next())
-                {
-                    url = qry.value(0).toString();
-                    title = qry.value(1).toString();
-                    scrollX = qry.value(3).toInt();
-                    scrollY = qry.value(4).toInt();
-                    icon = qry.value(5).toString();
-                    if(icon == ":/img/clipboard.svg")
-                    {
-                        window->clip = true;
-                        window->updateClipButton();
-                        QString app;
-                        QStringList list = url.split(' ');
-                        if(list.first() == "install:")
-                        {
-                            for(int i = 1; i < list.count(); i++)
-                            {
-                                window->install(list.at(i), false);
-                            }
-                        }
-                        else if(list.first() == "uninstall:")
-                        {
-                            for(int i = 1; i < list.count(); i++)
-                            {
-                                window->uninstall(list.at(i));
-                            }
-                        }
-                        url.clear();
-                        page++;
-                        if(qry.value(2).toInt() != 0) // is current page?
-                        {
-                            currentPage = page;
-                        }
-                        continue;
-                    }
-
-                    if(page == 0)
-                    {
-                        view = window->currentView();
-                    }
-                    else
-                    {
-                        view = window->tabWidget()->createBackgroundTab();
-                    }
-
-                    if(qry.value(2).toInt() != 0) // is current page?
-                    {
-                        currentPage = page;
-                        if(url.isEmpty() == false || title.isEmpty() == false)
-                        {
-                            view->delayScroll(QPoint(scrollX, scrollY));
-                            view->navigateTo(url);
-                            view->setFocus();
-                        }
-                    }
-                    else
-                    {
-                        if(url.isEmpty() == false || title.isEmpty() == false)
-                        {
-                            view->delayLoad(url, title, scrollX, scrollY);
-                        }
-                        window->tabWidget()->setTabToolTip(page, title);
-                    }
-
-                    view->setIcon(icon);
-                    page++;
-                }
-                window->tabWidget()->setCurrentIndex(currentPage);
-                window->tabWidget()->insertAfter = currentPage;
-            }
-            window->show();
-        }
-    }
-
     // initialize SIGHUP/SIGTERM signal handling
     if(::socketpair(AF_UNIX, SOCK_STREAM, 0, sighupFd))
     {
@@ -244,28 +129,74 @@ void Browser::handleSIGTERM()
     ssize_t i = ::read(sigtermFd[1], &tmp, sizeof(tmp));
     Q_UNUSED(i);
 
-    saveSettings();
+    saveAllWindows();
     sigtermNotifier->setEnabled(true);
 }
 
 Browser::~Browser()
 {
-    saveSettings();
+    saveAllWindows();
     closeAll();
 
     QSqlDatabase::removeDatabase(ds->connectionName);
 }
 
-BrowserWindow* Browser::createWindow()
+BrowserWindow* Browser::createWindow(int windowId)
 {
     BrowserWindow* window = new BrowserWindow();
-    window->browser = this;
+    if(windowId == -1)
+    {
+        window->windowId = createWindowId();
+    }
+    else
+    {
+        window->windowId = windowId;
+    }
+    window->setObjectName(QString("Window %1").arg(window->windowId + 1));
     windows.append(window);
-    connect(window, &QObject::destroyed, [this, window]()
+    connect(window, &QObject::destroyed, this, [this, window]()
     {
         windows.removeOne(window);
     });
     return window;
+}
+
+void Browser::deleteWindow(int windowId)
+{
+    QSqlDatabase db = QSqlDatabase::database(ds->connectionName);
+    QSqlQuery query(db);
+
+    db.transaction();
+
+    if(deleteWindow(windowId, query) == false)
+    {
+        db.rollback();
+        return;
+    }
+
+    db.commit();
+    db.close();
+}
+
+bool Browser::deleteWindow(int windowId, QSqlQuery& query)
+{
+    query.prepare("delete from WINDOW where WINDOWID = ?");
+    query.bindValue(0, windowId);
+    if(query.exec() == false)
+    {
+        qDebug() << "Could not delete " << windowId << " from WINDOW.";
+        return false;
+    }
+
+    query.prepare("delete from TAB where WINDOWID = ?");
+    query.bindValue(0, windowId);
+    if(query.exec() == false)
+    {
+        qDebug() << "Could not delete " << windowId << " from TAB.";
+        return false;
+    }
+
+    return true;
 }
 
 void Browser::closeAll()
@@ -277,98 +208,321 @@ void Browser::closeAll()
     windows.clear();
 }
 
-bool Browser::isWayland()
-{
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    if(env.contains("XDG_SESSION_TYPE"))
-    {
-        QString sessionType = env.value("XDG_SESSION_TYPE").toLatin1();
-        if(sessionType == "wayland")
-        {
-            return true;
-        }
-    }
-    else if(env.contains("WAYLAND_DISPLAY"))
-    {
-        return true;
-    }
-
-    return false;
-}
-
-void Browser::saveSettings()
+QVector<Browser::WindowHash> Browser::inactiveWindows()
 {
     QSqlDatabase db = QSqlDatabase::database(ds->connectionName);
     QSqlQuery qry(db);
-    QSqlQuery qwindow(db);
+    QVector<WindowHash> windows;
 
-    db.transaction();
-    qry.exec("delete from TAB");
-    qry.exec("delete from WINDOW");
-
-    CompositeView* view;
-    qwindow.prepare("insert into WINDOW (WINDOWID, X, Y, W, H) values (?, ?, ?, ?, ?)");
-    qry.prepare("insert into TAB (WINDOWID, TABID, URL, TITLE, SCROLLX, SCROLLY, CURRENTPAGE, ICON) values (?, ?, ?, ?, ?, ?, ?, ?)");
-
-    int windowId = 0;
-    int tabId = 0;
-    int tabCount;
-    QRect r;
-    foreach(BrowserWindow* window, windows)
+    if(qry.exec("select WINDOWID, TITLE from WINDOW where STATUS=0 order by TITLE"))
     {
-        if(isWayland())
+        WindowHash w;
+        while(qry.next())
         {
-            r = window->frameGeometry();
+            w.windowId = qry.value(0).toInt();
+            w.title = qry.value(1).toString();
+            windows.append(w);
         }
-        else
+    }
+
+    return windows;
+}
+
+void Browser::loadWindows(QSqlQuery& windowQuery, QSqlQuery& tabQuery)
+{
+    tabQuery.prepare("select URL, TITLE, CURRENTPAGE, SCROLLX, SCROLLY, ICON from TAB where WINDOWID=? order by TABID");
+
+    if(windowQuery.exec())
+    {
+        BrowserWindow* window;
+        CompositeView* view;
+        QString url;
+        QString title;
+        QString icon;
+        int scrollX, scrollY;
+        int currentPage;
+        int page;
+        int x, y, w, h;
+        int status;
+
+        while(windowQuery.next())
         {
-            r = window->geometry();
-        }
+            window = createWindow(windowQuery.value(0).toInt());
 
-        qwindow.bindValue(0, windowId);
-        qwindow.bindValue(1, r.x());
-        qwindow.bindValue(2, r.y());
-        qwindow.bindValue(3, r.width());
-        qwindow.bindValue(4, r.height());
-        if(qwindow.exec() == false)
-        {
-            qDebug() << "Could not execute query:" << qwindow.executedQuery();
-        }
-
-        tabCount = window->tabWidget()->count();
-        for(int i = 0; i < tabCount; i++)
-        {
-            view = window->tabWidget()->viewAt(i);
-
-            QPoint scroll = view->scrollPosition();
-            qry.bindValue(0, windowId);
-            qry.bindValue(1, tabId++);
-
-            if(view == window->installView)
+            x = windowQuery.value(1).toInt();
+            y = windowQuery.value(2).toInt();
+            w = windowQuery.value(3).toInt();
+            h = windowQuery.value(4).toInt();
+            if(isWayland())
             {
-                qry.bindValue(2, "install: " + window->installList.join(' '));
-            }
-            else if(view == window->uninstallView)
-            {
-                qry.bindValue(2, "uninstall: " + window->uninstallList.join(' '));
+                window->resize(w, h);
             }
             else
             {
-                qry.bindValue(2, view->url());
+                // for some reason, this messes up mapToGlobal() for popup menus on Wayland
+                window->setGeometry(x, y, w, h);
             }
-            qry.bindValue(3, view->title());
-            qry.bindValue(4, scroll.x());
-            qry.bindValue(5, scroll.y());
-            qry.bindValue(6, (i == window->tabWidget()->currentIndex()));
-            qry.bindValue(7, view->iconFileName);
-            if(qry.exec() == false)
+
+            title = windowQuery.value(5).toString();
+            if(title.isEmpty())
             {
-                qDebug() << "Could not execute query:" << qry.executedQuery();
+                title = QString("Window %1").arg(window->windowId + 1);
+            }
+            window->setObjectName(title);
+
+            window->clip = (windowQuery.value(6).toInt() == 1);
+            window->updateClipButton();
+
+            window->ask = (windowQuery.value(7).isNull() || windowQuery.value(7).toInt() == 1);
+            window->updateAskButton();
+            status = windowQuery.value(8).toInt();
+
+            tabQuery.bindValue(0, window->windowId);
+            if(tabQuery.exec())
+            {
+                page = 0;
+                currentPage = 0;
+                while(tabQuery.next())
+                {
+                    url = tabQuery.value(0).toString();
+                    title = tabQuery.value(1).toString();
+                    scrollX = tabQuery.value(3).toInt();
+                    scrollY = tabQuery.value(4).toInt();
+                    icon = tabQuery.value(5).toString();
+                    if(icon == ":/img/clipboard.svg")
+                    {
+                        QStringList list = url.split(' ');
+                        if(list.first() == "install:")
+                        {
+                            for(int i = 1; i < list.count(); i++)
+                            {
+                                window->install(list.at(i), false);
+                            }
+                        }
+                        else if(list.first() == "uninstall:")
+                        {
+                            for(int i = 1; i < list.count(); i++)
+                            {
+                                window->uninstall(list.at(i));
+                            }
+                        }
+                        url.clear();
+                        page++;
+
+                        if(tabQuery.value(2).toInt() != 0) // is current page?
+                        {
+                            currentPage = page;
+                            window->setWindowTitle(QString("%1 - %2").arg(title, window->objectName()));
+                        }
+                        continue;
+                    }
+
+                    if(page == 0)
+                    {
+                        view = window->currentView();
+                    }
+                    else
+                    {
+                        view = window->tabWidget()->createBackgroundTab();
+                    }
+
+                    if(tabQuery.value(2).toInt() != 0) // is current page?
+                    {
+                        currentPage = page;
+                        if(url.isEmpty() == false || title.isEmpty() == false)
+                        {
+                            view->delayScroll(QPoint(scrollX, scrollY));
+                            view->navigateTo(url);
+                            view->setFocus();
+                        }
+                        window->setWindowTitle(QString("%1 - %2").arg(title, window->objectName()));
+                    }
+                    else
+                    {
+                        if(url.isEmpty() == false || title.isEmpty() == false)
+                        {
+                            view->delayLoad(url, title, scrollX, scrollY);
+                        }
+                    }
+
+                    view->setIcon(icon);
+                    page++;
+                }
+                window->tabWidget()->setCurrentIndex(currentPage);
+                window->tabWidget()->insertAfter = currentPage;
+            }
+            if(status & WindowStatus::Maximized)
+            {
+                window->showMaximized();
+            }
+            else
+            {
+                window->show();
             }
         }
-
-        windowId++;
     }
+}
+
+void Browser::restoreWindows()
+{
+    QSqlDatabase db = QSqlDatabase::database(ds->connectionName);
+    QSqlQuery tabQuery(db);
+    QSqlQuery windowQuery(db);
+
+    windowQuery.prepare("select WINDOWID, X, Y, W, H, TITLE, CLIP, ASK, STATUS from WINDOW where STATUS is null or STATUS != 0 order by WINDOWID");
+    loadWindows(windowQuery, tabQuery);
+}
+
+void Browser::loadWindow(int windowId)
+{
+    QSqlDatabase db = QSqlDatabase::database(ds->connectionName);
+    QSqlQuery tabQuery(db);
+    QSqlQuery windowQuery(db);
+
+    windowQuery.prepare("select WINDOWID, X, Y, W, H, TITLE, CLIP, ASK, STATUS from WINDOW where WINDOWID=?");
+    windowQuery.bindValue(0, windowId);
+    loadWindows(windowQuery, tabQuery);
+
+    windowQuery.prepare("update WINDOW set STATUS=1 where WINDOWID = ?");
+    windowQuery.bindValue(0, windowId);
+    windowQuery.exec();
+}
+
+int Browser::createWindowId()
+{
+    int windowId = 0;
+
+    QSqlDatabase db = QSqlDatabase::database(ds->connectionName);
+    QSqlQuery qry(db);
+    if(qry.exec("select max(WINDOWID) from WINDOW"))
+    {
+        if(qry.next())
+        {
+            windowId = qry.value(0).toInt() + 1;
+        }
+    }
+
+    foreach(BrowserWindow* w, windows)
+    {
+        if(w->windowId >= windowId)
+        {
+            windowId = w->windowId + 1;
+        }
+    }
+
+    return windowId;
+}
+
+void Browser::saveWindow(BrowserWindow* window, bool active, QSqlQuery& qwindow, QSqlQuery& query)
+{
+    int windowStatus = (active ? Browser::Active : Browser::Inactive);
+    windowStatus |= (window->isMaximized() ? Browser::Maximized : 0);
+
+    int tabId = 0;
+    if(query.exec("select max(TABID) from TAB"))
+    {
+        if(query.next())
+        {
+            tabId = query.value(0).toInt() + 1;
+        }
+    }
+
+    int tabCount;
+
+    QRect r;
+    if(isWayland())
+    {
+        r = window->frameGeometry();
+    }
+    else
+    {
+        r = window->geometry();
+    }
+
+    qwindow.prepare("insert into WINDOW (WINDOWID, X, Y, W, H, TITLE, STATUS, CLIP, ASK) values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    query.prepare("insert into TAB (WINDOWID, TABID, URL, TITLE, SCROLLX, SCROLLY, CURRENTPAGE, ICON) values (?, ?, ?, ?, ?, ?, ?, ?)");
+
+    qwindow.bindValue(0, window->windowId);
+    qwindow.bindValue(1, r.x());
+    qwindow.bindValue(2, r.y());
+    qwindow.bindValue(3, window->unmaximizedSize.width());
+    qwindow.bindValue(4, window->unmaximizedSize.height());
+    qwindow.bindValue(5, window->objectName());
+    qwindow.bindValue(6, windowStatus);
+    qwindow.bindValue(7, window->clip);
+    qwindow.bindValue(8, window->ask);
+
+    if(qwindow.exec() == false)
+    {
+        qDebug() << "Query failed:" << qwindow.executedQuery();
+    }
+
+    CompositeView* view;
+    tabCount = window->tabWidget()->count();
+    for(int i = 0; i < tabCount; i++)
+    {
+        view = window->tabWidget()->viewAt(i);
+
+        QPoint scroll = view->scrollPosition();
+        query.bindValue(0, window->windowId);
+        query.bindValue(1, tabId++);
+
+        if(view == window->installView)
+        {
+            query.bindValue(2, "install: " + window->installList.join(' '));
+        }
+        else if(view == window->uninstallView)
+        {
+            query.bindValue(2, "uninstall: " + window->uninstallList.join(' '));
+        }
+        else
+        {
+            query.bindValue(2, view->url());
+        }
+        query.bindValue(3, view->title());
+        query.bindValue(4, scroll.x());
+        query.bindValue(5, scroll.y());
+        query.bindValue(6, (i == window->tabWidget()->currentIndex()));
+        query.bindValue(7, view->iconFileName);
+        if(query.exec() == false)
+        {
+            qDebug() << "Query failed:" << query.executedQuery();
+        }
+    }
+}
+
+void Browser::saveWindow(BrowserWindow* window, bool active)
+{
+    QSqlDatabase db = QSqlDatabase::database(ds->connectionName);
+    QSqlQuery query(db);
+    QSqlQuery qwindow(db);
+
+    db.transaction();
+
+    deleteWindow(window->windowId, query);
+    saveWindow(window, active, qwindow, query);
+
+    db.commit();
+    db.close();
+}
+
+void Browser::saveAllWindows()
+{
+    QSqlDatabase db = QSqlDatabase::database(ds->connectionName);
+    QSqlQuery query(db);
+    QSqlQuery qwindow(db);
+
+    db.transaction();
+    foreach(BrowserWindow* window, windows)
+    {
+        deleteWindow(window->windowId, query);
+    }
+
+    foreach(BrowserWindow* window, windows)
+    {
+        saveWindow(window, true, qwindow, query);
+    }
+
     db.commit();
     db.close();
 }

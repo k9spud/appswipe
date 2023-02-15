@@ -183,7 +183,7 @@ QString DataStorage::openDatabase()
             schemaVersion = query.value(0).toInt();
         }
 
-        if(schemaVersion < 3)
+        if(schemaVersion < 4)
         {
             upgradeDatabase(query, db, schemaVersion);
         }
@@ -219,6 +219,37 @@ bool DataStorage::upgradeDatabase(QSqlQuery& query, QSqlDatabase& db, int schema
 
     db.transaction();
 
+    if(schemaVersion < 4)
+    {
+        if(query.exec("alter table WINDOW add column TITLE text") == false)
+        {
+            qDebug() << "Couldn't add column WINDOW.TITLE upgrading from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+
+        if(query.exec("alter table WINDOW add column STATUS integer") == false)
+        {
+            qDebug() << "Couldn't add column WINDOW.STATUS upgrading from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+
+        if(query.exec("alter table WINDOW add column CLIP integer") == false)
+        {
+            qDebug() << "Couldn't add column WINDOW.CLIP upgrading from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+
+        if(query.exec("alter table WINDOW add column ASK integer") == false)
+        {
+            qDebug() << "Couldn't add column WINDOW.ASK upgrading from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+    }
+
     if(schemaVersion < 3)
     {
         if(query.exec("drop table PACKAGE") == false)
@@ -237,7 +268,7 @@ bool DataStorage::upgradeDatabase(QSqlQuery& query, QSqlDatabase& db, int schema
         return false;
     }
 
-    int finalVersion = 3;
+    int finalVersion = 4;
     query.prepare("update META set UUID=ifnull(UUID,?), SCHEMAVERSION=?");
     query.bindValue(0, QUuid::createUuid().toString(QUuid::WithoutBraces));
     query.bindValue(1, finalVersion);

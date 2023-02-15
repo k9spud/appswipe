@@ -26,6 +26,7 @@
 #include <QFileInfo>
 #include <QLabel>
 #include <QScrollBar>
+#include <QDir>
 
 CompositeView::CompositeView(QWidget* parent) : QWidget(parent)
 {
@@ -92,16 +93,20 @@ void CompositeView::navigateTo(QString text, bool changeHistory, bool feelingLuc
        return;
     }
 
-    if(text.startsWith("file://") == false && text.contains(':') == false)
+    if((text.startsWith("~/") || text.count('/') > 1) && text.contains(':') == false)
     {
+        if(text.startsWith("~/"))
+        {
+            text = QDir::homePath() + text.mid(1);
+        }
         QFileInfo fi(text);
         if(fi.exists())
         {
-            text.prepend("file://");
+            text.prepend("file:");
         }
     }
 
-    if(text.startsWith("file://"))
+    if(text.startsWith("file:"))
     {
         QString fileType = text.mid(text.lastIndexOf('.') + 1);
         QStringList imageFormats;

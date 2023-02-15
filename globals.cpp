@@ -16,9 +16,13 @@
 
 #include "globals.h"
 #include "k9portage.h"
+#include "browser.h"
+
+#include <QProcessEnvironment>
 
 K9Portage* portage = nullptr;
 RescanThread* rescan = nullptr;
+Browser* browser = nullptr;
 
 QString fileSize(qint64 size)
 {
@@ -47,4 +51,23 @@ QString fileSize(qint64 size)
     }
 
     return s;
+}
+
+bool isWayland(void)
+{
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    if(env.contains("XDG_SESSION_TYPE"))
+    {
+        QString sessionType = env.value("XDG_SESSION_TYPE").toLatin1();
+        if(sessionType == "wayland")
+        {
+            return true;
+        }
+    }
+    else if(env.contains("WAYLAND_DISPLAY"))
+    {
+        return true;
+    }
+
+    return false;
 }

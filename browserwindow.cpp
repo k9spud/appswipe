@@ -23,6 +23,7 @@
 #include "compositeview.h"
 #include "tabwidget.h"
 #include "k9shell.h"
+#include "k9mimedata.h"
 
 #include <QStringList>
 #include <QDebug>
@@ -34,12 +35,18 @@
 #include <QInputDialog>
 #include <QCloseEvent>
 #include <QMessageBox>
+#include <QDrag>
+#include <QDragEnterEvent>
+#include <QTabBar>
 
 BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::BrowserWindow)
 {
     setFocusPolicy(Qt::ClickFocus);
+    setAcceptDrops(true);
 
     ui->setupUi(this);
+
+    ui->newTabButton->tabWidget = ui->tabWidget;
 
     installView = nullptr;
     uninstallView = nullptr;
@@ -159,14 +166,9 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     });
     addAction(action);
 
-    action = new QAction("&New Window", this);
-    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
-    connect(action, &QAction::triggered, this, &BrowserWindow::openWindow);
-    addAction(action);
-
     action = new QAction(tr("&Close Tab"), this);
     action->setShortcuts(QKeySequence::Close);
-    connect(action, &QAction::triggered, [this]()
+    connect(action, &QAction::triggered, this, [this]()
     {
         if(ui->tabWidget->count() <= 1)
         {
@@ -207,11 +209,11 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     {
         if(title.isEmpty())
         {
-            setWindowTitle(QString("%1 v%2").arg(APP_NAME).arg(APP_VERSION));
+            setWindowTitle(objectName());
         }
         else
         {
-            setWindowTitle(QString("%1 - %2 v%3").arg(title).arg(APP_NAME).arg(APP_VERSION));
+            setWindowTitle(QString("%1 - %2").arg(title, objectName()));
         }
     });
 
@@ -227,7 +229,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     addAction(action);
 
     menu = new QMenu("App Menu", this);
-    menu->setStyleSheet("background-color: #393939;");
+    menu->setStyleSheet("background-color: #303030;\nborder: 1px solid #000000;");
 
     action = new QAction(this);
     action->setShortcut(QKeySequence(Qt::ALT | Qt::Key_F));
@@ -238,6 +240,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     connect(action, &QAction::triggered, this, []()
     {
         // might want to browse /var/db/repos/gentoo/metadata/news/ instead
+        // might also check /var/lib/gentoo/news/news-gentoo.unread to know when news is available?
         QString cmd = "eselect news read";
         shell->externalTerm(cmd, "News");
     });
@@ -251,9 +254,12 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     });
     menu->addAction(action);
 
+    menu->addSeparator();
+
     action = new QAction("Sync Repos", this);
     connect(action, &QAction::triggered, this, [this]()
     {
+        // QString cmd = "sudo emaint --auto sync";
         QString cmd = "sudo emerge --sync --nospinner";
         if(ask)
         {
@@ -269,11 +275,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     connect(action, &QAction::triggered, this, &BrowserWindow::reloadDatabase);
     menu->addAction(action);
 
-    action = new QAction("View Updates", this);
-    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_QuoteLeft));
-    connect(action, &QAction::triggered, this, &BrowserWindow::viewUpdates);
-    menu->addAction(action);
-    addAction(action);
+    menu->addSeparator();
 
     action = new QAction("Fetch Used World", this);
     connect(action, &QAction::triggered, this, [this]()
@@ -290,6 +292,12 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         exec(cmd, "Fetch All World");
     });
     menu->addAction(action);
+
+    action = new QAction("View Updates", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_QuoteLeft));
+    connect(action, &QAction::triggered, this, &BrowserWindow::viewUpdates);
+    menu->addAction(action);
+    addAction(action);
 
     action = new QAction("Update System", this);
     connect(action, &QAction::triggered, this, [this]()
@@ -315,6 +323,8 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     });
     menu->addAction(action);
 
+    menu->addSeparator();
+
     action = new QAction("Dispatch Config Changes", this);
     connect(action, &QAction::triggered, this, []()
     {
@@ -335,6 +345,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     });
     menu->addAction(action);
 
+    menu->addSeparator();
 
     action = new QAction("Exit", this);
     action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q));
@@ -345,9 +356,68 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     menu->addAction(action);
     addAction(action);
 
+    // ------------------------------------------------------------------------
+    tabsMenu = new QMenu("Tabs Menu", this);
+    tabsMenu->setStyleSheet("background-color: #303030;\nborder: 1px solid #000000;");
+
+    action = new QAction("&New Window", this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
+    connect(action, &QAction::triggered, this, &BrowserWindow::openWindow);
+    tabsMenu->addAction(action);
+    addAction(action);
+
+    inactiveWindows = new QMenu("Open", tabsMenu);
+    inactiveWindows->setStyleSheet("background-color: #2D2D2D;");
+    tabsMenu->addMenu(inactiveWindows);
+
+    action = new QAction(tr("&Rename Window..."), this);
+    action->setShortcut(QKeySequence(Qt::Key_F2));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        bool ok;
+        QString windowName = QInputDialog::getText(this, "Rename Window...", "Window title:", QLineEdit::Normal, objectName(), &ok);
+        if(ok)
+        {
+            setObjectName(windowName);
+            setWindowTitle(QString("%1 - %2").arg(currentView()->title(), windowName));
+            browser->saveWindow(this);
+        }
+    });
+    tabsMenu->addAction(action);
+    addAction(action);
+
+    action = new QAction(tr("Save A&ll"), this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
+    connect(action, &QAction::triggered, browser, &Browser::saveAllWindows);
+    tabsMenu->addAction(action);
+    addAction(action);
+
+    tabsMenu->addSeparator();
+
+    action = new QAction(tr("&Discard Window"), this);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_F4));
+    connect(action, &QAction::triggered, this, [this]()
+    {
+        int ret = QMessageBox::warning(this, tr("Discard Window"),
+                                       tr("Are you sure you want to discard \"%2?\"\n"
+                                          "There are %1 tabs open.").arg(ui->tabWidget->count()).arg(objectName()),
+                                       QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Cancel);
+
+        if(ret == QMessageBox::Cancel)
+        {
+            return;
+        }
+        else if(ret == QMessageBox::Discard)
+        {
+            browser->deleteWindow(windowId);
+        }
+    });
+    tabsMenu->addAction(action);
+    addAction(action);
+    // ------------------------------------------------------------------------
+
     setWorking(false);
-    setWindowTitle(QString("%1 v%2").arg(APP_NAME).arg(APP_VERSION));
-    setWindowTitle(APP_NAME);
+    setWindowTitle(QString("%1 v%2").arg(APP_NAME, APP_VERSION));
     updateAskButton();
     updateClipButton();
 
@@ -494,6 +564,26 @@ void BrowserWindow::on_newTabButton_clicked()
     ui->lineEdit->setFocus();
 }
 
+void BrowserWindow::on_newTabButton_longPressed()
+{
+    inactiveWindows->clear();
+    QVector<Browser::WindowHash> windows = browser->inactiveWindows();
+    QAction* action;
+    foreach(Browser::WindowHash w, windows)
+    {
+        action = inactiveWindows->addAction(w.title);
+        connect(action, &QAction::triggered, this, [w]()
+        {
+            browser->loadWindow(w.windowId);
+        });
+    }
+
+    QPoint point = mapToGlobal(ui->newTabButton->pos());
+    point.setX(point.x());
+    point.setY(point.y() + ui->newTabButton->height());
+    tabsMenu->exec(point);
+}
+
 void BrowserWindow::on_askButton_clicked()
 {
     ask = !ask;
@@ -602,10 +692,6 @@ void BrowserWindow::install(QString atom, bool isWorld)
         state.title = "Apps to Install...";
         installView->history->appendHistory(state);
     }
-    else
-    {
-        ui->tabWidget->setCurrentWidget(installView);
-    }
 
     if(installList.contains(atom) == false)
     {
@@ -650,10 +736,6 @@ void BrowserWindow::uninstall(QString atom)
         state.target = "";
         state.title = "Apps to Uninstall...";
         uninstallView->history->appendHistory(state);
-    }
-    else
-    {
-        ui->tabWidget->setCurrentWidget(uninstallView);
     }
 
     if(uninstallList.contains(atom) == false)
@@ -776,21 +858,37 @@ void BrowserWindow::closeEvent(QCloseEvent* event)
         return;
     }
 
-    if (ui->tabWidget->count() > 1)
+    if(ui->tabWidget->count() <= 1)
     {
-        int ret = QMessageBox::warning(this, tr("Confirm close"),
-                                       tr("Are you sure you want to close the window ?\n"
-                                          "There are %1 tabs open.").arg(ui->tabWidget->count()),
-                                       QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-        if (ret == QMessageBox::No)
-        {
-            event->ignore();
-            return;
-        }
+        browser->deleteWindow(windowId);
+    }
+    else
+    {
+        browser->saveWindow(this, false);
     }
 
     event->accept();
     deleteLater();
+}
+
+void BrowserWindow::resizeEvent(QResizeEvent* event)
+{
+    if(windowState() == Qt::WindowNoState || windowState() == Qt::WindowActive)
+    {
+        QRect r;
+        if(isWayland())
+        {
+            r = frameGeometry();
+        }
+        else
+        {
+            r = geometry();
+        }
+
+        unmaximizedSize = r.size();
+    }
+
+    QMainWindow::resizeEvent(event);
 }
 
 void BrowserWindow::keyPressEvent(QKeyEvent* event)
@@ -820,5 +918,49 @@ void BrowserWindow::keyPressEvent(QKeyEvent* event)
             event->accept();
             break;
     }
+}
+
+void BrowserWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+    const K9MimeData* mime = qobject_cast<const K9MimeData*>(event->mimeData());
+    if(mime != nullptr)
+    {
+        event->acceptProposedAction();
+    }
+}
+
+void BrowserWindow::dropEvent(QDropEvent* event)
+{
+    const K9MimeData* mime = qobject_cast<const K9MimeData*>(event->mimeData());
+
+    if(mime != nullptr)
+    {
+        QObject* source = event->source();
+        if(source == ui->tabWidget->tabBar() || source == ui->newTabButton)
+        {
+            event->acceptProposedAction();
+            return;
+        }
+
+        disconnect(mime->view->history, nullptr, mime->sourceTabWidget->window, nullptr);
+        disconnect(mime->view, nullptr, mime->sourceTabWidget, nullptr);
+
+        int dropAt = ui->tabWidget->insertAfter + 1;
+        int index = ui->tabWidget->insertTab(dropAt, mime->view, "");
+        ui->tabWidget->setTabIcon(index, mime->view->icon());
+        ui->tabWidget->setTabVisible(index, true);
+        ui->tabWidget->setCurrentWidget(mime->view);
+
+        ui->tabWidget->connectView(mime->view);
+
+        if(mime->sourceTabWidget->count() == 0)
+        {
+            BrowserWindow* window = mime->sourceTabWidget->window;
+            browser->deleteWindow(window->windowId);
+            window->deleteLater();
+        }
+    }
+
+    event->acceptProposedAction();
 }
 

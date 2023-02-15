@@ -22,6 +22,7 @@
 #include <QSocketNotifier>
 
 class BrowserWindow;
+class QSqlQuery;
 class Browser : public QObject
 {
     Q_OBJECT
@@ -29,28 +30,52 @@ public:
     explicit Browser(QObject *parent = nullptr);
     ~Browser();
 
+    struct WindowHash
+    {
+        int windowId;
+        QString title;
+    };
+    QVector<WindowHash> inactiveWindows();
+
+    enum WindowStatus
+    {
+        Inactive = 0,
+        Active   = 1,
+        Maximized =1<<2
+    };
+
+    void restoreWindows();
+    void loadWindows(QSqlQuery& windowQuery, QSqlQuery& tabQuery);
+    void loadWindow(int windowId);
+
     QVector<BrowserWindow*> windows;
 
-    BrowserWindow *createWindow();
+    BrowserWindow* createWindow(int windowId = -1);
     void closeAll();
-    void saveSettings();
+    int createWindowId();
+    void saveWindow(BrowserWindow* window, bool active = true);
+    void deleteWindow(int windowId);
 
     // Unix signal handlers
     static void unixSIGHUP(int unused);
     static void unixSIGTERM(int unused);
 
-    bool isWayland();
-    
 public slots:
     // Qt signal handlers
     void handleSIGHUP(void);
     void handleSIGTERM(void);
+
+    void saveAllWindows();
 
 signals:
 
 private:
     QSocketNotifier* sighupNotifier;
     QSocketNotifier* sigtermNotifier;
+
+    bool deleteWindow(int windowId, QSqlQuery& query);
+    void saveWindow(BrowserWindow* window, bool active, QSqlQuery& qwindow, QSqlQuery& query);
+
 };
 
 #endif // BROWSER_H
