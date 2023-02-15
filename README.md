@@ -10,9 +10,9 @@ upgrading apps.
 
 ![Screenshot](https://user-images.githubusercontent.com/39664841/139709601-35b9a8e7-e431-4631-98de-572ddafe5242.png)
 
-This program was written with Qt 5.15.7, ``dev-db/sqlite-3.40.1``, 
-``sys-apps/portage-3.0.41-r2``, ``app-portage/portage-utils-0.94.3``, 
-``dev-libs/glib-2.74.3-r3``, and ``lxde-base/lxterminal-0.4.0``.
+This program was written with Qt 5.15.8, ``sys-apps/portage-3.0.43-r1``, 
+``app-portage/portage-utils-0.94.3``, ``app-portage/gentoolkit-0.6.1-r3``, 
+``dev-libs/glib-2.74.4``, and ``lxde-base/lxterminal-0.4.0``.
 
 Installation
 ============
@@ -21,7 +21,7 @@ There is an ebuild for App Swipe in my
 [k9spud-overlay](https://github.com/k9spud/k9spud-overlay). 
 Alternatively, there is an App Swipe ebuild in the 
 [Project GURU](https://wiki.gentoo.org/wiki/Project:GURU) 
-repository, although theirs might lag a bit since I don't personally maintain 
+repository, although theirs may lag behind since I don't personally maintain 
 their ebuild.
 
 To add the k9spud-overlay to your system, do the following:
@@ -68,6 +68,12 @@ Keyboard Shortcuts
 
 `CTRL-Q` Saves each window's geometry and open tabs, then quits the application.
 
+`CTRL-SHIFT-S` Saves each window's geometry and open tabs, without quitting.
+
+`F2` Allows you to rename the current window.
+
+`CTRL-ALT-F4` Permanently discards the current window.
+
 `CTRL-TAB` Displays the next tab.
 
 `CTRL-SHIFT-TAB` Displays the prior tab.
@@ -100,37 +106,52 @@ Keyboard Shortcuts
 
 `ALT-F` Opens the app menu.
 
-What's New in v1.1.34?
+What's New in v1.1.40?
 ======================
 
-Added a workaround for popup menus showing up at the wrong location on screen
-when using Wayland.
+New tabs/window management. Now you can drag and drop a tab from one window 
+to another, just like modern web browsers. 
 
-Now ignores differences in the "subslot" number when generating an "update:" 
-list, to better match what Portage does.
+Right click or long press the "Open New Tab" button (the one with a circled 
+'+' symbol) to access the window management menu. You can rename each 
+browser window to whatever name you'd like to remember it by, close the 
+window, and later re-open that window with all of it's multiple tabs intact.
+Saved windows are still remembered even if you exit and re-start the app.
+Window maximized state should now save and restore properly, including 
+keeping the correct unmaximized window size intact if the window is maximized.
 
-"List files owned" now displays the package's file list in-app instead of 
-launching an external terminal window. This is still kind of clunky though,
-because Qt's QTextEdit widget chokes if you get a list of files that is too
-long. For now, we simply truncate the list if it exceeds 2,000 entries.
+This is very useful for categorizing groups of related apps together for 
+looking at later. It helps reduce memory usage and desktop clutter when
+closing windows that you aren't working on right now. When you're finally
+completely done with a window and it's tabs, use "Discard Window" to 
+permanently close and forget the window.
 
-Using an URL like "file:///" allows you to browse your file system 
-like old web browsers used to do for FTP sites. Added image viewing mode.
+Note: if you simply close a window, it is saved for later use, but only
+if it has multiple tabs open. If you close a window that has only one tab 
+open, it is assumed that what you really mean is that you don't care about
+that one open tab anymore, so the window is automatically permanently 
+discarded.
 
-Added right click menu option to "Build binary package" for those times when
-you want to build a package, but not install it immediately. 
+USE flags are now hyperlinked when viewing an app. Clicking the USE flag
+links brings up descriptions for the USE flag and other apps that accept
+a USE flag by the same name. 
 
-No longer uses XFCE's "exo" launcher and instead uses the "gio" launcher from
-``dev-libs/glib`` for launching an external browser. This eliminates the 
-dependency on XFCE, which itself was depending on ``dev-libs/glib`` under
-the hood anyway.
+When right clicking on whitespace while viewing an app in the browser,
+an alternative "Who depends on this?" reverse dependencies command has been
+added. This one uses the `qdepends` command from `portage-utils` instead
+of `equery depends.` `qdepends` seems to be blazingly fast compared to 
+`equery,` and it usually provides equally good info.
 
-Fixed a bug where closing the clipboard tab could cause the program to 
-segfault. The clipboard contents is now saved and restored when shutting down
-the application. 
+Added new "Install & rebuild reverse dependencies" command to app
+install right click menu. This option can sometimes come in handy 
+when `emerge` refuses to install an app because of dependency conflicts.
 
-Long pressing Forward/Back buttons now pops up a menu of page history for
-the given direction.
+Now automatically keyword unmasks apps in 
+/etc/portage/package.accept_keywords/appswipe.tmp whenever hitting the
+right click "Fetch source" command. This is kind of a hack -- it's
+a convenience feature to try to get fetching to "just go" no matter what.
+I do a lot of fetching new apps to try from my Raspberry Pi 4, and
+new apps almost never keyword arm64 off the bat.
 
 License
 =======
