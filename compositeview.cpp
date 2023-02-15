@@ -181,12 +181,13 @@ void CompositeView::reload(bool hardReload)
 
 void CompositeView::reloadingDatabase()
 {
-    if(browserView != nullptr)
+    if(browserView == nullptr)
+    {
+        browser()->reloadingDatabase();
+    }
+    else
     {
         browserView->reloadingDatabase();
-    }
-    else if(imageView != nullptr)
-    {
     }
 }
 

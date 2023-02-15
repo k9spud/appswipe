@@ -417,7 +417,6 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     // ------------------------------------------------------------------------
 
     setWorking(false);
-    setWindowTitle(QString("%1 v%2").arg(APP_NAME, APP_VERSION));
     updateAskButton();
     updateClipButton();
 
@@ -781,6 +780,7 @@ void BrowserWindow::reloadDatabase()
     currentView()->saveScrollPosition();
     currentView()->reloadingDatabase();
     currentView()->setStatus("Loading package database...");
+    setWindowTitle(QString("%1 v%2").arg(APP_NAME, APP_VERSION));
     rescan->rescan();
 }
 

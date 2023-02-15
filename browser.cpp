@@ -398,7 +398,14 @@ int Browser::createWindowId()
     {
         if(qry.next())
         {
-            windowId = qry.value(0).toInt() + 1;
+            if(qry.value(0).isNull())
+            {
+                windowId = 0;
+            }
+            else
+            {
+                windowId = qry.value(0).toInt() + 1;
+            }
         }
     }
 

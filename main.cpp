@@ -146,6 +146,7 @@ int main(int argc, char *argv[])
     {
         window = browser->windows.first();
     }
+
     if(window != nullptr)
     {
         if(ds->emptyDatabase)
