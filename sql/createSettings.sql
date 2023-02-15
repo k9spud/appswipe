@@ -18,14 +18,18 @@ create table if not exists META (
     SCHEMAVERSION integer,
     UUID text
 );
-insert into META(SCHEMAVERSION) SELECT 2 WHERE NOT EXISTS(SELECT 0 FROM META);
+insert into META(SCHEMAVERSION) SELECT 4 WHERE NOT EXISTS(SELECT 0 FROM META);
 
 create table if not exists WINDOW (
     WINDOWID integer primary key,
     X integer,
     Y integer,
     W integer,
-    H integer
+    H integer,
+    TITLE text,
+    STATUS integer,
+    CLIP integer,
+    ASK integer
 );
 
 create table if not exists TAB (

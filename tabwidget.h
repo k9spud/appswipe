@@ -36,9 +36,9 @@ public:
     explicit TabWidget(QWidget *parent = nullptr);
 
     BrowserWindow* window;
-
     CompositeView* currentView();
     CompositeView* viewAt(int index);
+    void connectView(CompositeView* view);
 
     virtual void setTabIcon(int index, const QIcon& icon);
 
@@ -49,7 +49,7 @@ public:
 
     QMenu* forwardMenu();
     QMenu* backMenu();
-
+    
 public slots:
     CompositeView* createTab();
     CompositeView* createEmptyTab();
