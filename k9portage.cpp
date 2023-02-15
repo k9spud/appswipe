@@ -115,14 +115,17 @@ void K9Portage::setRepoFolder(QString path)
     }
 }
 
+// see https://devmanual.gentoo.org/ebuild-writing/variables/ for a list of all predefined read-only variables in an ebuild
+// portageq envvar might be useful to retrieve more variables
+// portageq envvar CFLAGS
 void K9Portage::setVersion(QString v)
 {
     version.parse(v);
     vars["PVR"] = version.pvr;
     vars["PV"] = version.pv();
     vars["PR"] = version.pr();
-    vars["P"] = QString("%1-%2").arg(vars["PN"]).arg(vars["PV"]);
-    vars["PF"] = QString("%1-%2").arg(vars["PN"]).arg(version.pvr);
+    vars["P"] = QString("%1-%2").arg(vars["PN"], vars["PV"]);
+    vars["PF"] = QString("%1-%2").arg(vars["PN"], version.pvr);
 }
 
 QVariant K9Portage::var(QString key)
@@ -149,7 +152,7 @@ void K9Portage::parseVerCut(QString& value)
             matchFound = true;
             i = match.captured(2).toInt() - 1;
             j = match.captured(3).toInt() - 1;
-            value.replace(match.capturedStart(), match.capturedLength(), QString("%1.%2").arg(version.cut(i)).arg(version.cut(j)));
+            value.replace(match.capturedStart(), match.capturedLength(), QString("%1.%2").arg(version.cut(i), version.cut(j)));
         }
 
         match = verCutSingle.match(value);
@@ -227,7 +230,6 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
                 {
                     query.addBindValue(package);
                 }
-
 
                 if(version != "%")
                 {
@@ -766,11 +768,9 @@ void K9Portage::reloadApp(QString app)
     qint64 installed;
     QString version;
     QString installedFilePath;
-    QString categoryPath;
     QFileInfo fi;
     bool obsoleted;
 
-//    db.transaction();
     do
     {
         packageId = query.value(0).toInt();
@@ -778,7 +778,7 @@ void K9Portage::reloadApp(QString app)
         installed = query.value(2).toInt();
         obsoleted = query.value(3).toInt() != 0;
 
-        installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(category).arg(packageName).arg(version);
+        installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(category, packageName, version);
         fi.setFile(installedFilePath);
         if(fi.exists())
         {
@@ -789,7 +789,7 @@ void K9Portage::reloadApp(QString app)
                 updatePackage.bindValue(1, packageId);
                 if(updatePackage.exec() == false)
                 {
-                    qDebug() << QString("update installed %1/%2-%3 failed").arg(category).arg(packageName).arg(version);
+                    qDebug() << QString("update installed %1/%2-%3 failed").arg(category, packageName, version);
                 }
             }
         }
@@ -802,7 +802,7 @@ void K9Portage::reloadApp(QString app)
                     deletePackage.bindValue(0, packageId);
                     if(deletePackage.exec() == false)
                     {
-                        qDebug() << QString("delete uninstalled obsolete %1/%2-%3 failed").arg(category).arg(packageName).arg(version);
+                        qDebug() << QString("delete uninstalled obsolete %1/%2-%3 failed").arg(category, packageName, version);
                     }
                 }
                 else
@@ -812,7 +812,7 @@ void K9Portage::reloadApp(QString app)
                     updatePackage.bindValue(1, packageId);
                     if(updatePackage.exec() == false)
                     {
-                        qDebug() << QString("update uninstalled %1/%2-%3 failed").arg(category).arg(packageName).arg(version);
+                        qDebug() << QString("update uninstalled %1/%2-%3 failed").arg(category, packageName, version);
                     }
                 }
             }
@@ -831,7 +831,7 @@ void K9Portage::applyMasks(QSqlDatabase& db)
     dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
     foreach(QString maskFile, dir.entryList())
     {
-        readMaskFile(QString("%1/%2").arg(dir.path()).arg(maskFile), query);
+        readMaskFile(QString("%1/%2").arg(dir.path(), maskFile), query);
     }
 
     foreach(QString repo, repos)
@@ -855,7 +855,7 @@ QString K9Portage::linkDependency(QString input)
         filter.replace(">", "&gt;");
         if(category.contains("*") == false && package.contains("*") == false)
         {
-            return QString("%1<A HREF=\"app:%2/%3\">%2/%3</A>-%4").arg(filter).arg(category).arg(package).arg(version);
+            return QString("%1<A HREF=\"app:%2/%3\">%2/%3</A>-%4").arg(filter, category, package, version);
         }
     }
 
@@ -867,7 +867,7 @@ QString K9Portage::linkDependency(QString input)
         QString slot = match.captured(3);
         if(category.contains("*") == false && package.contains("*") == false)
         {
-            return QString("<A HREF=\"app:%1/%2\">%1/%2</A>:%3").arg(category).arg(package).arg(slot);
+            return QString("<A HREF=\"app:%1/%2\">%1/%2</A>:%3").arg(category, package, slot);
         }
     }
 
@@ -882,7 +882,7 @@ QString K9Portage::linkDependency(QString input)
         filter.replace(">", "&gt;");
         if(category.contains("*") == false && package.contains("*") == false)
         {
-            return QString("%1<A HREF=\"app:%2/%3\">%2/%3</A>%4").arg(filter).arg(category).arg(package).arg(uses);
+            return QString("%1<A HREF=\"app:%2/%3\">%2/%3</A>%4").arg(filter, category, package, uses);
         }
     }
 

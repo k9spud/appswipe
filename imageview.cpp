@@ -15,12 +15,9 @@
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "imageview.h"
-#include "main.h"
 #include "globals.h"
 #include "compositeview.h"
-#include "browserwindow.h"
 #include "history.h"
-#include "tabwidget.h"
 
 #include <QPainter>
 #include <QDir>
@@ -75,7 +72,7 @@ void ImageView::showFile(QString file)
         fileList.clear();
         path = fi.canonicalPath();
     }
-    composite->iconFileName = QString("%1/%2").arg(path).arg(fileName);
+    composite->iconFileName = QString("%1/%2").arg(path, fileName);
     setWindowTitle(QString("%1").arg(fileName));
 
     freeImage();
@@ -88,7 +85,7 @@ void ImageView::showFile(QString file)
 
     if(reader.read(image) == false || image->isNull())
     {
-        QString msg = QString("%1:\n%2\n%3 bytes").arg(reader.errorString()).arg(file).arg(fi.size());
+        QString msg = QString("%1:\n%2\n%3 bytes").arg(reader.errorString(), file).arg(fi.size());
         showError(file, msg + "\n");
         return;
     }
@@ -552,8 +549,8 @@ void ImageView::keyPressEvent(QKeyEvent* event)
                                                fileName, &ok);
                 if(ok && text != fileName)
                 {
-                    QString oldName = QString("%1/%2").arg(path).arg(fileName);
-                    QString newName = QString("%1/%2").arg(path).arg(text);
+                    QString oldName = QString("%1/%2").arg(path, fileName);
+                    QString newName = QString("%1/%2").arg(path, text);
                     if(QFile::rename(oldName, newName) == false)
                     {
                         QMessageBox::critical(this, tr("Error"), tr("Could not rename file:\n") + oldName + "\nto:\n" + newName);
@@ -565,7 +562,7 @@ void ImageView::keyPressEvent(QKeyEvent* event)
                         {
                             fileList[currentItem] = newName;
                         }
-                        composite->iconFileName = QString("%1/%2").arg(path).arg(fileName);
+                        composite->iconFileName = QString("%1/%2").arg(path, fileName);
                         setWindowTitle(QString("%1 %2x%3").arg(fi.fileName()).arg(image->width()).arg(image->height()));
                         QString target = QString("file://%1").arg(newName);
                         emit urlChanged(target);
@@ -660,7 +657,7 @@ void ImageView::mouseReleaseEvent(QMouseEvent* event)
                 QPoint delta = event->pos() - mousePressPoint;
                 if(delta == QPoint(0, 0))
                 {
-                    emit openInNewTab(QString("file://%1/%2").arg(path).arg(fileName));
+                    emit openInNewTab(QString("file://%1/%2").arg(path, fileName));
                 }
                 else
                 {
@@ -855,7 +852,7 @@ void ImageView::moveNext()
         showFile(fi.absoluteFilePath());
 
         History::State state;
-        state.target = QString("file://%1/%2").arg(path).arg(fileName);
+        state.target = QString("file://%1/%2").arg(path, fileName);
         state.title = QString("%1 %2x%3").arg(fileName).arg(image->width()).arg(image->height());
         emit updateState(state);
         emit urlChanged(state.target);
@@ -893,7 +890,7 @@ void ImageView::movePrevious()
         showFile(fi.absoluteFilePath());
 
         History::State state;
-        state.target = QString("file://%1/%2").arg(path).arg(fileName);
+        state.target = QString("file://%1/%2").arg(path, fileName);
         state.title = QString("%1 %2x%3").arg(fileName).arg(image->width()).arg(image->height());
         emit updateState(state);
         emit urlChanged(state.target);
