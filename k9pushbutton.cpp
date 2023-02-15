@@ -15,31 +15,129 @@
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "k9pushbutton.h"
+#include "tabwidget.h"
+#include "browserwindow.h"
+#include "browser.h"
+#include "compositeview.h"
+#include "k9mimedata.h"
+#include "globals.h"
 
-#include <QFontMetrics>
-#include <QFrame>
+#include <QMouseEvent>
+#include <QDrag>
 
 #define LONGPRESSMS 500
 
 K9PushButton::K9PushButton(QWidget* parent) : QPushButton(parent)
 {
+    tabWidget = nullptr;
     connect(&timer, SIGNAL(timeout()), this, SLOT(longPressTimeout()));
 }
 
-void K9PushButton::mousePressEvent(QMouseEvent* e)
+void K9PushButton::longPressTimeout()
 {
-    timer.start(LONGPRESSMS);
-    e->accept();
+    timer.stop();
+    emit longPressed();
 }
 
-void K9PushButton::mouseReleaseEvent(QMouseEvent* e)
+void K9PushButton::mousePressEvent(QMouseEvent* event)
 {
+    if(tabWidget != nullptr)
+    {
+        pressedPoint = event->pos();
+
+        if(event->button() == Qt::LeftButton)
+        {
+            moving = true;
+        }
+        else
+        {
+            moving = false;
+            if(event->button() == Qt::RightButton)
+            {
+                emit longPressed();
+                event->accept();
+                return;
+            }
+        }
+    }
+
+    timer.start(LONGPRESSMS);
+    QPushButton::mousePressEvent(event);
+}
+
+void K9PushButton::mouseMoveEvent(QMouseEvent* event)
+{
+    if(tabWidget != nullptr)
+    {
+        QPoint pos = event->pos();
+        if(moving)
+        {
+            QPoint delta = pos - pressedPoint;
+            if(delta.x() > 30 || delta.x() < -30)
+            {
+                if(tabWidget->currentView() != nullptr)
+                {
+                    moving = false;
+                    timer.stop();
+                    CompositeView* view = tabWidget->currentView();
+
+                    QDrag* drag = new QDrag(this);
+                    drag->setPixmap(view->icon().pixmap(32, 32));
+
+                    K9MimeData *mimeData = new K9MimeData();
+                    mimeData->setData("CompositeView", QByteArray("AppSwipe"));
+                    mimeData->view = view;
+                    mimeData->sourceIndex = tabWidget->indexOf(view);
+                    mimeData->sourceTabWidget = tabWidget;
+                    drag->setMimeData(mimeData);
+
+                    Qt::DropAction action = drag->exec();
+
+                    if(action == Qt::IgnoreAction)
+                    {
+                        if(tabWidget->count() > 1)
+                        {
+                            BrowserWindow* window  = browser->createWindow();
+                            TabWidget* newTabWidget = window->tabWidget();
+
+                            disconnect(view->history, nullptr, tabWidget->window, nullptr);
+                            disconnect(view, nullptr, tabWidget, nullptr);
+
+                            int index = newTabWidget->addTab(view, "");
+                            newTabWidget->setTabIcon(index, view->icon());
+                            newTabWidget->setTabVisible(index, true);
+
+                            newTabWidget->connectView(view);
+
+                            int w, h;
+                            w = tabWidget->window->width();
+                            h = tabWidget->window->height();
+                            window->resize(w, h);
+                            window->show();
+                        }
+                    }
+
+                    moving = false;
+                    event->accept();
+                    return;
+                }
+            }
+        }
+    }
+
+    QPushButton::mouseMoveEvent(event);
+}
+
+void K9PushButton::mouseReleaseEvent(QMouseEvent* event)
+{
+    moving = false;
+
     if(timer.isActive())
     {
         timer.stop();
-        e->accept();
+        event->accept();
 
-        switch(e->button())
+        switch(event->button())
         {
             case Qt::LeftButton:
                 emit clicked();
@@ -54,10 +152,5 @@ void K9PushButton::mouseReleaseEvent(QMouseEvent* e)
         }
     }
 
-}
-
-void K9PushButton::longPressTimeout()
-{
-    timer.stop();
-    emit longPressed();
+    QPushButton::mouseReleaseEvent(event);
 }

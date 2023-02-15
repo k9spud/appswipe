@@ -22,6 +22,12 @@
 
 class QLabel;
 class QPushButton;
+class QDrag;
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDropEvent;
+class TabWidget;
+class CompositeView;
 class K9TabBar : public QTabBar
 {
     Q_OBJECT
@@ -37,14 +43,23 @@ protected:
     bool eventFilter(QObject *object, QEvent *event) override;
 
     virtual void wheelEvent(QWheelEvent *event) override;
+    virtual void mousePressEvent(QMouseEvent *event) override;
     virtual void mouseMoveEvent(QMouseEvent *event) override;
     virtual void mouseReleaseEvent(QMouseEvent *event) override;
+
+    virtual void dragEnterEvent(QDragEnterEvent *event) override;
+    virtual void dropEvent(QDropEvent *event) override;
 
     virtual void enterEvent(QEvent *event) override;
     virtual void leaveEvent(QEvent *event) override;
 
     QLabel* label;
     int labeledTab;
+
+    bool moving;
+    bool movingResist;
+    CompositeView* movingView;
+    QPoint pressedPoint;
 };
 
 #endif // K9TABBAR_H

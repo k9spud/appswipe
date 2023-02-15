@@ -17,30 +17,34 @@
 #ifndef K9PUSHBUTTON_H
 #define K9PUSHBUTTON_H
 
-#include <QtWidgets/QPushButton>
-#include <QtGui/QMouseEvent>
+#include <QPushButton>
+#include <QMouseEvent>
 #include <QTimer>
 
+class TabWidget;
 class K9PushButton : public QPushButton
 {
     Q_OBJECT
 
     public:
-        K9PushButton(QWidget *parent = Q_NULLPTR);
+        K9PushButton(QWidget *parent = nullptr);
+
+        TabWidget* tabWidget;
 
     signals:
-        void clicked();
         void longPressed();
 
     protected:
         virtual void mousePressEvent(QMouseEvent* event) override;
         virtual void mouseReleaseEvent(QMouseEvent* event) override;
+        virtual void mouseMoveEvent(QMouseEvent *event) override;
+        bool moving;
+        QPoint pressedPoint;
+
+        QTimer timer;
 
     private slots:
         void longPressTimeout();
-
-    protected:
-        QTimer timer;
 };
 
 #endif // K9PUSHBUTTON_H
