@@ -214,7 +214,7 @@ values
 
                     downloadSize = -1;
                     installed = 0;
-                    installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(categories.at(categoryId)).arg(packageName).arg(portage->version.pvr);
+                    installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(categories.at(categoryId), packageName, portage->version.pvr);
                     fi.setFile(installedFilePath);
                     if(fi.exists())
                     {
@@ -376,7 +376,7 @@ values
                 input.close();
                 data = data.trimmed();
 
-                installedFilePath = QString("/var/db/repos/%1/%2/%3/%3-%4.ebuild").arg(data).arg(categories.at(categoryId)).arg(packageName).arg(portage->version.pvr);
+                installedFilePath = QString("/var/db/repos/%1/%2/%3/%3-%4.ebuild").arg(data,categories.at(categoryId), packageName, portage->version.pvr);
                 if(QFile::exists(installedFilePath))
                 {
                     // already imported this package from the repo directory
@@ -408,7 +408,7 @@ values
                     }
                 }
 
-                ebuildFilePath = QString("%1/%2.ebuild").arg(buildsPath).arg(package);
+                ebuildFilePath = QString("%1/%2.ebuild").arg(buildsPath, package);
                 fi.setFile(ebuildFilePath);
                 installed = fi.birthTime().toSecsSinceEpoch();
                 published = 0;
