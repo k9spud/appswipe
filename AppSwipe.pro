@@ -1,4 +1,4 @@
-QT       += core gui sql
+QT       += core gui sql svg
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -18,6 +18,7 @@ SOURCES += \
     history.cpp \
     imageview.cpp \
     k9lineedit.cpp \
+    k9mimedata.cpp \
     k9portage.cpp \
     k9pushbutton.cpp \
     k9shell.cpp \
@@ -37,6 +38,7 @@ HEADERS += \
     history.h \
     imageview.h \
     k9lineedit.h \
+    k9mimedata.h \
     k9portage.h \
     k9pushbutton.h \
     k9shell.h \
