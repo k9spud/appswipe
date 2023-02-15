@@ -174,7 +174,8 @@ void History::back()
     {
         if(backStates)
         {
-            backStates->removeAction(backStates->actions().first());
+            QList<QAction*> list = backStates->actions();
+            backStates->removeAction(list.first());
         }
 
         if(forwardStates)
@@ -194,7 +195,8 @@ void History::forward()
     {
         if(forwardStates)
         {
-            forwardStates->removeAction(forwardStates->actions().first());
+            QList<QAction*> list = forwardStates->actions();
+            forwardStates->removeAction(list.first());
         }
 
         if(backStates)
@@ -272,7 +274,8 @@ QAction* History::prependMenu(QMenu* menu, int historyIndex)
     else
     {
         action = new QAction(state.title, menu);
-        menu->insertAction(menu->actions().first(), action);
+        QList<QAction*> list = menu->actions();
+        menu->insertAction(list.first(), action);
     }
 
     action->setStatusTip(state.target);

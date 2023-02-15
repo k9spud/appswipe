@@ -53,15 +53,15 @@ public:
     QMenu* backMenu();
 
 public slots:
-    void appendHistory(const State& s);
-    void updateState(const State& s);
+    void appendHistory(const History::State& s);
+    void updateState(const History::State& s);
     void back();
     void forward();
     void checkEnables(void);
 
 signals:
-    void enableChanged(WebAction action, bool enabled);
-    void stateChanged(State s);
+    void enableChanged(History::WebAction action, bool enabled);
+    void stateChanged(History::State s);
 
     void hovered(QString text);
 
