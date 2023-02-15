@@ -29,5 +29,6 @@
         <file>img/new.svg</file>
         <file>img/folder.svg</file>
         <file>img/document.svg</file>
+        <file>img/flag.svg</file>
     </qresource>
 </RCC>
