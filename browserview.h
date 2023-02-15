@@ -42,7 +42,6 @@ class BrowserView : public QTextEdit
     Q_OBJECT
 public:
     explicit BrowserView(QWidget *parent = nullptr);
-    QMenu* createStandardContextMenu(const QPoint &position);
 
     QString currentUrl;
     QPoint scrollPosition();
@@ -55,6 +54,11 @@ public:
 
     QString appNoVersion(QString app);
     QString appVersion(QString app);
+
+    void contextMenuUninstallLink(QMenu* menu, QString urlPath);
+    void contextMenuInstallLink(QMenu* menu, QString urlPath);
+    void contextMenuAppLink(QMenu* menu, QString urlPath);
+    void contextMenuAppWhitespace(QMenu* menu);
 
 signals:
     void urlChanged(const QUrl& url);
@@ -78,6 +82,7 @@ public slots:
     void viewFile(QString fileName);
     void viewFolder(QString folderPath);
     void viewApp(const QUrl& url);
+    void viewUseFlag(const QUrl& url);
     void viewAppFiles(const QUrl& url);
     void viewUpdates(QString action);
     void reloadApp(const QUrl& url);
@@ -87,14 +92,14 @@ public slots:
 protected slots:
     void swipeUpdate(void);
 
-    void processFinished(int exitCode, QProcess::ExitStatus exitStatus);
-    void processReadStandardError();
-    void processReadStandardOutput();
+    void quseProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void qlistProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    virtual void keyPressEvent(QKeyEvent *event) override;
 
     bool scrollGrabbed;
     bool swiping;
@@ -103,8 +108,6 @@ protected:
     int dy;
     QTimer animationTimer;
 
-    virtual void keyPressEvent(QKeyEvent *event) override;
-
     virtual void contextMenuEvent(QContextMenuEvent *event) override;
 
     QHash<QString, QString> iconMap;    // category type, icon resource file name
@@ -112,6 +115,7 @@ protected:
     QString lastSearch;
     QString oldLink;
     QString context;
+    QString useApp;
     bool isWorld;
 
     void fetchUpdates(QSqlQuery* query);
