@@ -106,52 +106,53 @@ Keyboard Shortcuts
 
 `ALT-F` Opens the app menu.
 
-What's New in v1.1.40?
+What's New in v1.1.41?
 ======================
 
 New tabs/window management. Now you can drag and drop a tab from one window 
 to another, just like modern web browsers. 
 
-Right click or long press the "Open New Tab" button (the one with a circled 
-'+' symbol) to access the window management menu. You can rename each 
-browser window to whatever name you'd like to remember it by, close the 
-window, and later re-open that window with all of it's multiple tabs intact.
-Saved windows are still remembered even if you exit and re-start the app.
-Window maximized state should now save and restore properly, including 
-keeping the correct unmaximized window size intact if the window is maximized.
+Right click or long press the "Open New Tab" button to access the window 
+management menu. You can rename each browser window to whatever name you'd 
+like to remember it by. Close the window, and later re-open that window 
+with all of it's multiple tabs intact. Saved windows are still remembered 
+even when you exit and re-start the app. Window maximized state now restores
+properly, including keeping the correct unmaximized window size intact when 
+the window is maximized.
 
-This is very useful for categorizing groups of related apps together for 
-looking at later. It helps reduce memory usage and desktop clutter when
-closing windows that you aren't working on right now. When you're finally
-completely done with a window and it's tabs, use "Discard Window" to 
-permanently close and forget the window.
+The new tabs/window management is good for categorizing groups of related 
+apps together for looking at later. It helps reduce memory usage and
+screen clutter when closing windows that aren't important right now. 
+When you're finallycompletely done with a window and it's tabs, use 
+"Discard Window" to permanently close the window.
 
-Note: if you simply close a window, it is saved for later use, but only
-if it has multiple tabs open. If you close a window that has only one tab 
-open, it is assumed that what you really mean is that you don't care about
-that one open tab anymore, so the window is automatically permanently 
-discarded.
+Note: if you simply close a window (rather than "Discard"), the window is 
+saved for later use, but only if it has multiple tabs open. If you close a 
+window that has only one tab open, it is assumed that what you really mean 
+is that you don't care about that one tab anymore, so the window is 
+automatically permanently discarded.
 
-USE flags are now hyperlinked when viewing an app. Clicking the USE flag
-links brings up descriptions for the USE flag and other apps that accept
+USE flags are now hyperlinked when viewing an app. Clicking a USE flag
+link brings up descriptions for the USE flag and other apps that accept
 a USE flag by the same name. 
 
-When right clicking on whitespace while viewing an app in the browser,
-an alternative "Who depends on this?" reverse dependencies command has been
+An alternative "Who depends on this?" reverse dependencies command has been
 added. This one uses the `qdepends` command from `portage-utils` instead
-of `equery depends.` `qdepends` seems to be blazingly fast compared to 
-`equery,` and it usually provides equally good info.
+of `equery depends.` `qdepends` seems to be blazingly fast compared to
+`equery,` and it usually provides equally good info. Right click in the 
+whitespace (not on an hyperlink) when viewing an app to access this 
+alternate reverse dependencies lookup.
 
 Added new "Install & rebuild reverse dependencies" command to app
 install right click menu. This option can sometimes come in handy 
 when `emerge` refuses to install an app because of dependency conflicts.
 
-Now automatically keyword unmasks apps in 
-/etc/portage/package.accept_keywords/appswipe.tmp whenever hitting the
-right click "Fetch source" command. This is kind of a hack -- it's
-a convenience feature to try to get fetching to "just go" no matter what.
-I do a lot of fetching new apps to try from my Raspberry Pi 4, and
-new apps almost never keyword arm64 off the bat.
+I fetch new apps to try out on my Raspberry Pi 4 often, and new apps almost 
+never keyword "arm64" off the bat. When "Fetch source" is used, App Swipe 
+now automatically adds the selected app to 
+`/etc/portage/package.accept_keywords/appswipe.tmp`. This is kind of a 
+hack -- but it's just too convenient for making fetch source "just go" no 
+matter what emerge thinks.
 
 License
 =======

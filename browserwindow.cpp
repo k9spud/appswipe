@@ -410,6 +410,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         else if(ret == QMessageBox::Discard)
         {
             browser->deleteWindow(windowId);
+            deleteLater();
         }
     });
     tabsMenu->addAction(action);
