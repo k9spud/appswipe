@@ -415,6 +415,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     QString buildDepend;
     QString runDepend;
     QString postDepend;
+    QString lastBuilt;
     QStringList runtimeDeps;
     QStringList optionalDeps;
     QStringList installtimeDeps;
@@ -540,6 +541,14 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
         if(input.open(QIODevice::ReadOnly))
         {
             postDepend = input.readAll();
+            input.close();
+        }
+
+        s = QString("/var/db/pkg/%1/%2-%3/BUILD_TIME").arg(category, package, version);
+        input.setFileName(s);
+        if(input.open(QIODevice::ReadOnly))
+        {
+            lastBuilt = input.readAll();
             input.close();
         }
 
@@ -800,6 +809,13 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                 }
                 html.append("</P>\n");
             }
+        }
+
+        if(lastBuilt.isEmpty() == false)
+        {
+            QDateTime lastBuiltDT;
+            lastBuiltDT.setSecsSinceEpoch(lastBuilt.toInt());
+            html.append(QString("<P><B>Last built:</B> %1</P>").arg(lastBuiltDT.toString("dddd MMMM d, yyyy h:mm AP")));
         }
 
         if(cFlags.isEmpty() == false)
