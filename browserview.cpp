@@ -40,10 +40,8 @@
 #include <QSqlError>
 #include <QProcess>
 #include <QTemporaryFile>
-#include <QTextStream>
 #include <QClipboard>
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QDateTime>
 #include <QRegularExpression>
@@ -164,7 +162,7 @@ void BrowserView::navigateTo(QString text, bool changeHistory, bool feelingLucky
 {
     if(text.isEmpty())
     {
-        about();
+        viewAbout();
     }
     else
     {
@@ -295,7 +293,7 @@ void BrowserView::setUrl(const QUrl& url)
     else if(scheme == "about")
     {
         currentUrl = url.toString();
-        about();
+        viewAbout();
     }
     else if(scheme == "app")
     {
@@ -336,7 +334,7 @@ void BrowserView::reload(bool hardReload)
     clear();
     if(currentUrl.isEmpty())
     {
-        about();
+        viewAbout();
     }
     else
     {
@@ -2936,8 +2934,6 @@ void BrowserView::showUpdates(QSqlQuery* query, QString result)
     {
         emit titleChanged(documentTitle());
     }
-
-    setFocus();
 }
 
 void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString search, bool feelingLucky)
@@ -3124,8 +3120,6 @@ void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString sear
     {
         emit titleChanged(documentTitle());
     }
-
-    setFocus();
 }
 
 void BrowserView::printApp(QString& result, QString& app, QString& description, QString& latestVersion, QStringList& installedVersions, QStringList& obsoletedVersions)
@@ -3300,7 +3294,7 @@ QString BrowserView::findAppIcon(bool& hasIcon, QString category, QString packag
     return appicon;
 }
 
-void BrowserView::about()
+void BrowserView::viewAbout()
 {
     composite->setIcon(":/img/appicon.svg");
 
@@ -3310,7 +3304,7 @@ void BrowserView::about()
 <TITLE>About</TITLE>
 <HEAD>
 <BODY>
-<IMG SRC=":/img/appicon.svg" HEIGHT=297 ALIGN=RIGHT><P><FONT SIZE=+2>%1 v%2</FONT><BR>
+<IMG SRC=":/img/appicon.svg" HEIGHT=297 ALIGN=RIGHT><P><FONT SIZE=+2><A HREF="https://github.com/k9spud/appswipe">%1 v%2</A></FONT><BR>
 %3</P>
 
 <P>This program is free software; you can redistribute it and/or
@@ -3342,7 +3336,6 @@ USA.</UL></P>
     {
         emit titleChanged(documentTitle());
     }
-    setFocus();
 }
 
 QPoint BrowserView::saveScrollPosition()
@@ -3430,7 +3423,6 @@ void BrowserView::viewFile(QString fileName)
     {
         emit titleChanged(documentTitle());
     }
-    setFocus();
 }
 
 void BrowserView::viewFolder(QString folderPath)
@@ -3509,7 +3501,6 @@ void BrowserView::viewFolder(QString folderPath)
     {
         emit titleChanged(documentTitle());
     }
-    setFocus();
 }
 
 void BrowserView::error(QString text)

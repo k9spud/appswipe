@@ -77,7 +77,7 @@ public slots:
     void error(QString text);
     void reload(bool hardReload = true);
 
-    void about();
+    void viewAbout();
     void reloadingDatabase();
     void viewFile(QString fileName);
     void viewFolder(QString folderPath);
