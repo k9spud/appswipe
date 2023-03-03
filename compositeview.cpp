@@ -81,7 +81,7 @@ void CompositeView::navigateTo(QString text, bool changeHistory, bool feelingLuc
 {
     if(text.isEmpty())
     {
-        browser()->about();
+        browser()->viewAbout();
         return;
     }
 
