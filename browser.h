@@ -54,7 +54,7 @@ public:
     void closeAll();
     int createWindowId();
     void saveWindow(BrowserWindow* window, bool active = true);
-    void deleteWindow(int windowId);
+    void discardWindow(int windowId);
 
     // Unix signal handlers
     static void unixSIGHUP(int unused);
@@ -73,7 +73,7 @@ private:
     QSocketNotifier* sighupNotifier;
     QSocketNotifier* sigtermNotifier;
 
-    bool deleteWindow(int windowId, QSqlQuery& query);
+    bool discardWindow(int windowId, QSqlQuery& query);
     void saveWindow(BrowserWindow* window, bool active, QSqlQuery& qwindow, QSqlQuery& query);
 
 };

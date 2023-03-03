@@ -182,7 +182,7 @@ void K9TabBar::dropEvent(QDropEvent* event)
         if(mime->sourceTabWidget->count() == 0)
         {
             BrowserWindow* window = mime->sourceTabWidget->window;
-            browser->deleteWindow(window->windowId);
+            browser->discardWindow(window->windowId);
             window->deleteLater();
         }
     }

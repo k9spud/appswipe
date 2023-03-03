@@ -409,7 +409,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         }
         else if(ret == QMessageBox::Discard)
         {
-            browser->deleteWindow(windowId);
+            browser->discardWindow(windowId);
             deleteLater();
         }
     });
@@ -861,7 +861,7 @@ void BrowserWindow::closeEvent(QCloseEvent* event)
 
     if(ui->tabWidget->count() <= 1)
     {
-        browser->deleteWindow(windowId);
+        browser->discardWindow(windowId);
     }
     else
     {
@@ -957,7 +957,7 @@ void BrowserWindow::dropEvent(QDropEvent* event)
         if(mime->sourceTabWidget->count() == 0)
         {
             BrowserWindow* window = mime->sourceTabWidget->window;
-            browser->deleteWindow(window->windowId);
+            browser->discardWindow(window->windowId);
             window->deleteLater();
         }
     }

@@ -161,14 +161,14 @@ BrowserWindow* Browser::createWindow(int windowId)
     return window;
 }
 
-void Browser::deleteWindow(int windowId)
+void Browser::discardWindow(int windowId)
 {
     QSqlDatabase db = QSqlDatabase::database(ds->connectionName);
     QSqlQuery query(db);
 
     db.transaction();
 
-    if(deleteWindow(windowId, query) == false)
+    if(discardWindow(windowId, query) == false)
     {
         db.rollback();
         return;
@@ -178,7 +178,7 @@ void Browser::deleteWindow(int windowId)
     db.close();
 }
 
-bool Browser::deleteWindow(int windowId, QSqlQuery& query)
+bool Browser::discardWindow(int windowId, QSqlQuery& query)
 {
     query.prepare("delete from WINDOW where WINDOWID = ?");
     query.bindValue(0, windowId);
@@ -506,7 +506,7 @@ void Browser::saveWindow(BrowserWindow* window, bool active)
 
     db.transaction();
 
-    deleteWindow(window->windowId, query);
+    discardWindow(window->windowId, query);
     saveWindow(window, active, qwindow, query);
 
     db.commit();
@@ -522,7 +522,7 @@ void Browser::saveAllWindows()
     db.transaction();
     foreach(BrowserWindow* window, windows)
     {
-        deleteWindow(window->windowId, query);
+        discardWindow(window->windowId, query);
     }
 
     foreach(BrowserWindow* window, windows)
