@@ -56,13 +56,7 @@ TabWidget::TabWidget(QWidget *parent) : QTabWidget(parent)
 
 CompositeView* TabWidget::currentView()
 {
-    int index = currentIndex();
-    if(index >= 0 && index < count())
-    {
-        return qobject_cast<CompositeView*>(widget(index));
-    }
-
-    return createTab();
+    return viewAt(currentIndex());
 }
 
 CompositeView* TabWidget::viewAt(int index)
