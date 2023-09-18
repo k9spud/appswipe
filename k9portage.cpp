@@ -746,6 +746,16 @@ void K9Portage::reloadApp(QString app)
     db.setDatabaseName(ds->storageFolder + ds->databaseFileName);
     db.open();
 
+    QStringList atoms;
+    if(app.contains(' '))
+    {
+        atoms = app.split(' ');
+    }
+    else
+    {
+        atoms.append(app);
+    }
+
     QSqlQuery query(db);
     QSqlQuery updatePackage(db);
     QSqlQuery deletePackage(db);
@@ -753,71 +763,77 @@ void K9Portage::reloadApp(QString app)
     updatePackage.prepare("update PACKAGE set INSTALLED=? where PACKAGEID=?");
     deletePackage.prepare("delete from PACKAGE where PACKAGEID=?");
 
-    QStringList x = app.split('/');
-    QString category = x.first();
-    QString packageName = x.last();
-    query.bindValue(0, category);
-    query.bindValue(1, packageName);
-
-    if(query.exec() == false || query.first() == false)
+    QStringList x;
+    QString category;
+    QString packageName;
+    foreach(QString atom, atoms)
     {
-        return;
-    }
+        x = atom.split('/');
+        category = x.first();
+        packageName = x.last();
+        query.bindValue(0, category);
+        query.bindValue(1, packageName);
 
-    qint64 packageId;
-    qint64 installed;
-    QString version;
-    QString installedFilePath;
-    QFileInfo fi;
-    bool obsoleted;
-
-    do
-    {
-        packageId = query.value(0).toInt();
-        version = query.value(1).toString();
-        installed = query.value(2).toInt();
-        obsoleted = query.value(3).toInt() != 0;
-
-        installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(category, packageName, version);
-        fi.setFile(installedFilePath);
-        if(fi.exists())
+        if(query.exec() == false || query.first() == false)
         {
-            if(installed == 0)
-            {
-                installed = fi.birthTime().toSecsSinceEpoch();
-                updatePackage.bindValue(0, installed);
-                updatePackage.bindValue(1, packageId);
-                if(updatePackage.exec() == false)
-                {
-                    qDebug() << QString("update installed %1/%2-%3 failed").arg(category, packageName, version);
-                }
-            }
+            return;
         }
-        else
+
+        qint64 packageId;
+        qint64 installed;
+        QString version;
+        QString installedFilePath;
+        QFileInfo fi;
+        bool obsoleted;
+
+        do
         {
-            if(installed)
+            packageId = query.value(0).toInt();
+            version = query.value(1).toString();
+            installed = query.value(2).toInt();
+            obsoleted = query.value(3).toInt() != 0;
+
+            installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(category, packageName, version);
+            fi.setFile(installedFilePath);
+            if(fi.exists())
             {
-                if(obsoleted)
+                if(installed == 0)
                 {
-                    deletePackage.bindValue(0, packageId);
-                    if(deletePackage.exec() == false)
-                    {
-                        qDebug() << QString("delete uninstalled obsolete %1/%2-%3 failed").arg(category, packageName, version);
-                    }
-                }
-                else
-                {
-                    installed = 0;
+                    installed = fi.birthTime().toSecsSinceEpoch();
                     updatePackage.bindValue(0, installed);
                     updatePackage.bindValue(1, packageId);
                     if(updatePackage.exec() == false)
                     {
-                        qDebug() << QString("update uninstalled %1/%2-%3 failed").arg(category, packageName, version);
+                        qDebug() << QString("update installed %1/%2-%3 failed").arg(category, packageName, version);
                     }
                 }
             }
-        }
-    } while(query.next());
+            else
+            {
+                if(installed)
+                {
+                    if(obsoleted)
+                    {
+                        deletePackage.bindValue(0, packageId);
+                        if(deletePackage.exec() == false)
+                        {
+                            qDebug() << QString("delete uninstalled obsolete %1/%2-%3 failed").arg(category, packageName, version);
+                        }
+                    }
+                    else
+                    {
+                        installed = 0;
+                        updatePackage.bindValue(0, installed);
+                        updatePackage.bindValue(1, packageId);
+                        if(updatePackage.exec() == false)
+                        {
+                            qDebug() << QString("update uninstalled %1/%2-%3 failed").arg(category, packageName, version);
+                        }
+                    }
+                }
+            }
+        } while(query.next());
+    }
 }
 
 void K9Portage::applyMasks(QSqlDatabase& db)
