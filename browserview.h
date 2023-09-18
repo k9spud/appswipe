@@ -84,13 +84,15 @@ public slots:
     void viewApp(const QUrl& url);
     void viewUseFlag(const QUrl& url);
     void viewAppFiles(const QUrl& url);
-    void viewUpdates(QString action);
+    void viewUpdates(QString action, QString filter);
     void reloadApp(const QUrl& url);
     void searchApps(QString search, bool feelingLucky = false);
     void whatsNew(QString search, bool feelingLucky = false);
 
 protected slots:
     void swipeUpdate(void);
+    void longPressTimeout();
+    void copyAvailableEvent(bool yes);
 
     void quseProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void qlistProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -103,11 +105,14 @@ protected:
 
     bool scrollGrabbed;
     bool swiping;
+    bool selecting;
     int oldScrollValue;
     int oldY;
     int dy;
     QTimer animationTimer;
-
+    QTimer longPressTimer;
+    QPoint startPress;
+    bool eatPress;
     virtual void contextMenuEvent(QContextMenuEvent *event) override;
 
     QHash<QString, QString> iconMap;    // category type, icon resource file name
@@ -118,8 +123,9 @@ protected:
     QString useApp;
     bool isWorld;
 
-    void fetchUpdates(QSqlQuery* query);
-    void showUpdates(QSqlQuery* query, QString header);
+    void fetch(QSqlQuery* query);
+    void upgrade(QSqlQuery* query);
+    void showUpdates(QSqlQuery* query, QString header, QString filter);
     void showQueryResult(QSqlQuery* query, QString header, QString search, bool feelingLucky = false);
     void printApp(QString& result, QString& app, QString& description, QString& latestVersion, QStringList& installedVersions, QStringList& obsoletedVersions);
     QString findAppIcon(bool& hasIcon, QString category, QString package, QString version);

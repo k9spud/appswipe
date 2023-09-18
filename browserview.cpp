@@ -39,7 +39,6 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QProcess>
-#include <QTemporaryFile>
 #include <QClipboard>
 #include <QDir>
 #include <QFileInfo>
@@ -103,6 +102,8 @@ BrowserView::BrowserView(QWidget *parent) : QTextEdit(parent)
     scrollGrabbed = false;
     swiping = false;
     connect(&animationTimer, SIGNAL(timeout()), this, SLOT(swipeUpdate()));
+    connect(&longPressTimer, &QTimer::timeout, this, &BrowserView::longPressTimeout);
+    connect(this, &QTextEdit::copyAvailable, this, &BrowserView::copyAvailableEvent);
 }
 
 QPoint BrowserView::scrollPosition()
@@ -174,9 +175,15 @@ void BrowserView::navigateTo(QString text, bool changeHistory, bool feelingLucky
            return;
         }
 
-        if(text.startsWith("update:fetch"))
+        if(text.startsWith("fetch:"))
         {
-            viewUpdates("fetch");
+            viewUpdates("fetch", text.mid(6));
+            return;
+        }
+
+        if(text.startsWith("upgrade:"))
+        {
+            viewUpdates("upgrade", text.mid(8));
             return;
         }
 
@@ -323,8 +330,8 @@ void BrowserView::setUrl(const QUrl& url)
     else if(scheme == "update")
     {
         currentUrl = url.toString();
-        QString action = url.path(QUrl::FullyDecoded);
-        viewUpdates(action);
+        QString filter = url.path(QUrl::FullyDecoded);
+        viewUpdates("update", filter);
     }
 }
 
@@ -387,6 +394,17 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     query.bindValue(0, category);
     query.bindValue(1, package);
 
+    bool foundApp = query.exec() && query.first();
+    if(foundApp == false)
+    {
+        // try again, without stripping what we thought was a version number last time...
+        package = x.last();
+        version.clear();
+        query.bindValue(0, category);
+        query.bindValue(1, package);
+        foundApp = query.exec() && query.first();
+    }
+
     QString html;
     bool installed;
     bool obsoleted;
@@ -428,7 +446,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     html.append(QString("<HEAD><TITLE>%1</TITLE></HEAD>\n<BODY>").arg(package));
 
     isWorld = false;
-    if(query.exec() && query.first())
+    if(foundApp)
     {
         while(1)
         {            
@@ -1259,7 +1277,7 @@ void BrowserView::viewAppFiles(const QUrl& url)
     }
 }
 
-void BrowserView::viewUpdates(QString action)
+void BrowserView::viewUpdates(QString action, QString filter)
 {
     QSqlDatabase db;
     if(QSqlDatabase::contains("GuiThread") == false)
@@ -1283,12 +1301,63 @@ void BrowserView::viewUpdates(QString action)
 
     QSqlQuery query(db);
 
+    QString sqlFilter;
+    QString positiveFilter;
+    QString item;
+    QStringList filters;
+    QStringList sqlFilters;
+    QStringList sqlNegativeFilters;
+    if(filter.isEmpty() == false)
+    {
+        if(filter.contains(' '))
+        {
+            filters = filter.split(' ');
+        }
+        else
+        {
+            filters.append(filter);
+        }
+
+        foreach(item, filters)
+        {
+            if(item.isEmpty())
+            {
+                continue;
+            }
+
+            if(item.startsWith('-'))
+            {
+                sqlNegativeFilters.append(item.mid(1));
+                sqlFilter.append("\nand (c.CATEGORY not like ? and p.PACKAGE not like ?)");
+            }
+            else
+            {
+                sqlFilters.append(item);
+                if(positiveFilter.isEmpty())
+                {
+                    positiveFilter = "c.CATEGORY like ? or p.PACKAGE like ?";
+                }
+                else
+                {
+                    positiveFilter.append(" or c.CATEGORY like ? or p.PACKAGE like ?");
+                }
+            }
+        }
+        sqlFilter.prepend(QString("\nand (%1)").arg(positiveFilter));
+        sqlFilters.append(sqlNegativeFilters);
+        sqlNegativeFilters.clear();
+
+        filters.clear();
+    }
+
     QString sql =
         QString(R"EOF(
             select c.CATEGORY, p.PACKAGE, p2.VERSION, p.DESCRIPTION, p.INSTALLED, p.MASKED, p.OBSOLETED, p.KEYWORDS, p.VERSION
             from PACKAGE p
             inner join CATEGORY c on c.CATEGORYID=p.CATEGORYID
-            inner join PACKAGE p2 on p2.PACKAGE=p.PACKAGE and p2.CATEGORYID=p.CATEGORYID and p2.SLOT is p.SLOT and p2.PACKAGEID != p.PACKAGEID and p2.INSTALLED=0 and p2.MASKED=0 and
+            inner join PACKAGE p2 on p2.PACKAGE=p.PACKAGE and p2.CATEGORYID=p.CATEGORYID and
+                p2.SLOT is p.SLOT and p2.PACKAGEID != p.PACKAGEID and p2.INSTALLED=0 and p2.MASKED=0 and
+                p2.VERSION != '9999' and p2.VERSION != '99999' and p2.VERSION != '999999' and p2.VERSION != '9999999' and p2.VERSION != '99999999' and p2.VERSION != '999999999' and
             (
                 (p2.V1 > p.V1 or (p.V1 is null and p2.V1 is not null)) or
                 (p2.V1 is p.V1 and (p2.V2 > p.V2 or (p.V2 is null and p2.V2 is not null))) or
@@ -1302,21 +1371,41 @@ void BrowserView::viewUpdates(QString action)
                 (p.STATUS is null or p.STATUS=0) or
                 (p.STATUS=1 and p2.STATUS>=1) or
                 (p.STATUS=2 and p2.STATUS=2)
-            )
+            ) %1 %2
             order by c.CATEGORY, p.PACKAGE, p.MASKED, p2.V1 desc, p2.V2 desc, p2.V3 desc, p2.V4 desc, p2.V5 desc, p2.V6 desc
             limit 10000
-            )EOF");
+            )EOF").arg(sqlFilter);
 
     query.prepare(sql);
 
+    foreach(item, sqlFilters)
+    {
+        QString glob = item.replace('*', "%");
+        if(item.contains('/'))
+        {
+            QStringList x = glob.split('/');
+            query.addBindValue("%" + x.first() + "%");
+            query.addBindValue("%" + x.last() + "%");
+        }
+        else
+        {
+            query.addBindValue("%" + glob + "%");
+            query.addBindValue("%" + glob + "%");
+        }
+    }
+
     if(action == "fetch")
     {
-        fetchUpdates(&query);
+        fetch(&query);
+    }
+    else if(action == "upgrade")
+    {
+        upgrade(&query);
     }
     else
     {
         composite->setIcon(":/img/search.svg");
-        showUpdates(&query, result);
+        showUpdates(&query, result, filter);
     }
 }
 
@@ -1825,9 +1914,15 @@ void BrowserView::swipeUpdate()
 
 void BrowserView::mousePressEvent(QMouseEvent* event)
 {
+    selecting = false;
+    eatPress = false;
     if(event->button() == Qt::LeftButton)
     {
         animationTimer.stop(); // immediately stop swipe scrolling if user presses screen
+
+        startPress = event->pos();
+        longPressTimer.start(LONGPRESS_MSECS_THRESHOLD);
+
         QPointF p = event->pos();
         p.setX(p.x() + horizontalScrollBar()->value());
         p.setY(p.y() + verticalScrollBar()->value());
@@ -1843,11 +1938,22 @@ void BrowserView::mousePressEvent(QMouseEvent* event)
         scrollGrabbed = false;
     }
 
-    QString link = anchorAt(event->pos());
-    if(link.isEmpty())
-    {
-        QTextEdit::mousePressEvent(event);
-    }
+    QTextEdit::mousePressEvent(event);
+}
+
+void BrowserView::longPressTimeout()
+{
+    longPressTimer.stop();
+    QContextMenuEvent::Reason reason = QContextMenuEvent::Mouse;
+    QContextMenuEvent e(reason, startPress);
+    contextMenuEvent(&e);
+    eatPress = true;
+    scrollGrabbed = false;
+}
+
+void BrowserView::copyAvailableEvent(bool yes)
+{
+    selecting = yes;
 }
 
 void BrowserView::mouseMoveEvent(QMouseEvent* event)
@@ -1862,6 +1968,8 @@ void BrowserView::mouseMoveEvent(QMouseEvent* event)
                 return;
             }
 
+            longPressTimer.stop();
+            eatPress = false;
             swiping = true;
             viewport()->setCursor(Qt::ClosedHandCursor);
         }
@@ -1886,6 +1994,14 @@ void BrowserView::mouseMoveEvent(QMouseEvent* event)
     }
 
     QPointF p = event->pos();
+
+    // don't allow long press click if mouse is being moved around.
+    QPointF delta = p - startPress;
+    if(delta.x() > 3 || delta.x() < -3 || delta.y() > 3 || delta.y() < -3)
+    {
+        longPressTimer.stop();
+    }
+
     p.setX(p.x() + horizontalScrollBar()->value());
     p.setY(p.y() + verticalScrollBar()->value());
 
@@ -1925,6 +2041,8 @@ void BrowserView::mouseMoveEvent(QMouseEvent* event)
 
 void BrowserView::mouseReleaseEvent(QMouseEvent* event)
 {
+    longPressTimer.stop();
+
     QString link;
 
     switch(event->button())
@@ -1969,7 +2087,7 @@ void BrowserView::mouseReleaseEvent(QMouseEvent* event)
             else
             {
                 link = anchorAt(event->pos());
-                if(link.isEmpty())
+                if(link.isEmpty() || eatPress || selecting)
                 {
                     QTextEdit::mouseReleaseEvent(event);
                     return;
@@ -2646,7 +2764,7 @@ QString BrowserView::appVersion(QString app)
     return "";
 }
 
-void BrowserView::fetchUpdates(QSqlQuery* query)
+void BrowserView::fetch(QSqlQuery* query)
 {
     QString category;
     QString app;
@@ -2753,7 +2871,125 @@ void BrowserView::fetchUpdates(QSqlQuery* query)
     composite->window->exec(cmd, QString("Fetch %1 Updates").arg(appCount));
 }
 
-void BrowserView::showUpdates(QSqlQuery* query, QString result)
+void BrowserView::upgrade(QSqlQuery* query)
+{
+    QString category;
+    QString app;
+    QString package;
+    QString version;
+    QString description;
+    QString keywords;
+    QString nextCategory;
+    QString nextPackage;
+
+    QString bestMatchApps;
+    QString obsoletedApps;
+    QString installedApps;
+    QString availableApps;
+
+    bool installed;
+    bool obsoleted;
+    bool masked;
+    int appCount = 0;
+
+    QString latestUnmaskedVersion;
+    QStringList obsoletedVersions;
+    QStringList installedVersions;
+    QString installedVersion;
+    QStringList packagesPayload;
+    bool exitLoop = false;
+
+    if(query->exec() == false || query->first() == false)
+    {
+        return;
+    }
+    category = query->value(0).toString();
+    package = query->value(1).toString();
+    installedVersions.clear();
+    obsoletedVersions.clear();
+    latestUnmaskedVersion.clear();
+
+    while(exitLoop == false)
+    {
+        version = query->value(2).toString();
+        installedVersion = query->value(8).toString();
+        if(installedVersions.isEmpty())
+        {
+            description = query->value(3).toString();
+        }
+        installed = (query->value(4).toInt() != 0);
+        masked = (query->value(5).toInt() != 0);
+        obsoleted = (query->value(6).toInt() != 0);
+        keywords = query->value(7).toString();
+        if(((masked == false && keywords.contains(portage->arch)) || installed) &&
+           latestUnmaskedVersion.isEmpty())
+        {
+            latestUnmaskedVersion = version;
+        }
+
+        if(obsoleted)
+        {
+            obsoletedVersions.append(installedVersion);
+        }
+        else if(installed)
+        {
+            installedVersions.append(installedVersion);
+        }
+
+        if(query->next() == false)
+        {
+            exitLoop = true;
+        }
+        else
+        {
+            nextCategory = query->value(0).toString();
+            nextPackage = query->value(1).toString();
+        }
+
+        if(exitLoop || nextCategory != category || nextPackage != package)
+        {
+            if(package.isEmpty() == false)
+            {
+                appCount++;
+                app = QString("%1/%2").arg(category, package);
+                packagesPayload.append(QString("=%1/%2-%3").arg(category, package, latestUnmaskedVersion));
+            }
+
+            category = nextCategory;
+            package = nextPackage;
+            installedVersions.clear();
+            obsoletedVersions.clear();
+            latestUnmaskedVersion.clear();
+        }
+    }
+
+    if(appCount == 0)
+    {
+        return;
+    }
+
+    QString cmd;
+    QStringList reloadPayload;
+    foreach(QString app, packagesPayload)
+    {
+        app = app.mid(1);
+        reloadPayload.append(appNoVersion(app));
+        cmd.append(QString("qlop -Hp =%1\n").arg(app));
+    }
+
+    cmd.append("sudo emerge --newuse --verbose --verbose-conflicts --nospinner --oneshot ");
+    if(composite->window->ask)
+    {
+        cmd.append("--ask ");
+    }
+
+    cmd.append(packagesPayload.join(' '));
+
+    cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged \"%2\"").arg(qApp->applicationFilePath(), reloadPayload.join(' ')).arg(qApp->applicationPid()));
+    composite->window->exec(cmd, QString("Upgrading %1 Packages").arg(appCount));
+}
+
+void BrowserView::showUpdates(QSqlQuery* query, QString result, QString filter)
 {
     QString category;
     QString app;
@@ -2900,7 +3136,7 @@ void BrowserView::showUpdates(QSqlQuery* query, QString result)
         return;
     }
 
-    result.append(QString("<P>%1 upgradable packages found. <B><A HREF=\"update:fetch\">Fetch All</A></B></P>\n").arg(appCount));
+    result.append(QString("<P><B><A HREF=\"fetch:%2\">Fetch</A> or <A HREF=\"upgrade:%2\">Upgrade</A></B> %1 packages:</P>\n").arg(appCount).arg(filter));
 
     if(appCount == 1)
     {
@@ -2995,7 +3231,8 @@ void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString sear
         obsoleted = (query->value(6).toInt() != 0);
         keywords = query->value(7).toString();
         if(((masked == false && keywords.contains(portage->arch)) || installed) &&
-           latestUnmaskedVersion.isEmpty())
+           latestUnmaskedVersion.isEmpty() &&
+           version != "9999" && version != "99999" && version != "999999" && version != "9999999" && version != "99999999" && version != "999999999")
         {
             latestUnmaskedVersion = version;
         }
