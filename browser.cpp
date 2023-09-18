@@ -469,6 +469,10 @@ void Browser::saveWindow(BrowserWindow* window, bool active, QSqlQuery& qwindow,
     for(int i = 0; i < tabCount; i++)
     {
         view = window->tabWidget()->viewAt(i);
+        if(view == nullptr)
+        {
+            continue;
+        }
 
         QPoint scroll = view->scrollPosition();
         query.bindValue(0, window->windowId);
