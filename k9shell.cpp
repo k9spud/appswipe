@@ -64,6 +64,7 @@ void K9Shell::externalTerm(QString script, QString title, bool waitSuccessful)
         }
 
         if(cmd.contains("RET_CODE=$?") == false &&
+           cmd.contains("qlop -Hp") == false &&
            cmd.contains(QString("%1").arg(qApp->applicationFilePath())) == false)
         {
             out << "echo \"" << escaped << "\"\n";
@@ -100,6 +101,7 @@ void K9Shell::externalTerm(QString script, QString title, bool waitSuccessful)
             out << "done\n";
         }
     }
+    out << QString("rm -f \"%1\"").arg(tmp->fileName());
     out.flush();
     tmp->close();
 
