@@ -280,7 +280,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Fetch Used World", this);
     connect(action, &QAction::triggered, this, [this]()
     {
-        QString cmd = "sudo emerge --update @world --fetchonly --newuse --deep --with-bdeps=y --nospinner ";
+        QString cmd = "sudo emerge --update @world --fetchonly --newuse --deep --with-bdeps=y --changed-use --nospinner ";
         exec(cmd, "Fetch Used World");
     });
     menu->addAction(action);
@@ -288,7 +288,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Fetch All World", this);
     connect(action, &QAction::triggered, this, [this]()
     {
-        QString cmd = "sudo emerge --update @world --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner";
+        QString cmd = "sudo emerge --update @world --fetch-all-uri --newuse --deep --with-bdeps=y --changed-use --nospinner";
         exec(cmd, "Fetch All World");
     });
     menu->addAction(action);
@@ -307,6 +307,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         {
             cmd.append(" --ask");
         }
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(qApp->applicationFilePath()).arg(qApp->applicationPid()));
         exec(cmd, "Update System");
     });
     menu->addAction(action);
@@ -314,11 +315,12 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Update World", this);
     connect(action, &QAction::triggered, this, [this]()
     {
-        QString cmd = "sudo emerge --update @world --newuse --deep --with-bdeps=y --verbose --verbose-conflicts --nospinner";
+        QString cmd = "sudo emerge --update @world --newuse --deep --with-bdeps=y --changed-use --verbose --verbose-conflicts --nospinner";
         if(ask)
         {
             cmd.append(" --ask");
         }
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(qApp->applicationFilePath()).arg(qApp->applicationPid()));
         exec(cmd, "Update World");
     });
     menu->addAction(action);
@@ -513,6 +515,14 @@ void BrowserWindow::stop()
     if(rescan != nullptr)
     {
         rescan->abort = true;
+    }
+    if(working == false)
+    {
+        CompositeView* view = currentView();
+        if(view != nullptr)
+        {
+            view->setStatus("");
+        }
     }
     setWorking(false);
 }
