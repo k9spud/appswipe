@@ -225,12 +225,8 @@ BrowserView* CompositeView::browser()
         connect(browserView, &BrowserView::loadFinished, this, &CompositeView::applyDelayedScroll, Qt::QueuedConnection);
         connect(browserView, &BrowserView::openInNewTab, this, &CompositeView::openInNewTab);
 
-        if(imageView != nullptr)
-        {
-            layout()->removeWidget(imageView);
-            imageView->deleteLater();
-            imageView = nullptr;
-        }
+        discardView(imageView);
+        imageView = nullptr;
     }
 
     return browserView;
@@ -250,14 +246,19 @@ ImageView* CompositeView::image()
         connect(imageView, &ImageView::openInNewTab, this, &CompositeView::openInNewTab);
         connect(imageView, &ImageView::iconChanged, this, &CompositeView::iconChanged);
 
-        if(browserView != nullptr)
-        {
-            layout()->removeWidget(browserView);
-            browserView->deleteLater();
-            browserView = nullptr;
-        }
+        discardView(browserView);
+        browserView = nullptr;
     }
     return imageView;
+}
+
+void CompositeView::discardView(QWidget* view)
+{
+    if(view != nullptr)
+    {
+        layout()->removeWidget(view);
+        view->deleteLater();
+    }
 }
 
 void CompositeView::resizeStatusBar()

@@ -63,6 +63,8 @@ public:
     BrowserView* browser();
     ImageView* image();
 
+    void discardView(QWidget* view);
+
 signals:
     void urlChanged(const QUrl& url);
     void titleChanged(const QString& title);
