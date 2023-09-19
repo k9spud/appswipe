@@ -15,8 +15,8 @@ Help Get the Word Out
 
 If you like this program, help us reach more people by clicking the `Star`
 button at the top of our [Github](https://github.com/k9spud/appswipe) page.
-It costs nothing and it helps App Swipe get listed higher up on the 
-Github search results when people are looking for this sort of thing.
+It costs nothing and it helps App Swipe get listed higher up in Github 
+search results when people are looking for this sort of thing.
 
 Installation
 ============
@@ -120,18 +120,22 @@ click and hold to trigger a "right click."
 9999, 99999, 999999, 9999999, 99999999, or 99999999 (just to be sure).
 
 The `View Updates` screen now features an `Upgrade` button to let you emerge
-all the upgradable packages that App Swipe can see. 
+all the upgradable packages that App Swipe sees. This is similar to
+`Update World`, except App Swipe doesn't burn a bunch of CPU cycles 
+determining which package dependencies descend from your @world list like
+emerge does. Instead, we just list any package already installed on your 
+system that could be upgraded to a newer version.
 
 The `View Updates` URL input box now supports adding filters.
-Let's say you only want to see the subset of upgradable packages
+Let's say you only want the subset of upgradable packages
 that contain the word `qt` for example. The URL `update:qt` will let you see
 only those packages, and the `Fetch` or `Upgrade` buttons on this page will 
 limit itself to only fetching or upgrading the `qt` subset as well. 
 
 You can also apply negative filters. Let's say you want to upgrade Qt 
 packages, but you want to avoid `qtwebengine` for now (because that one is 
-*huge* and takes *forever*). You can simply use the URL 
-`update:qt -qtwebengine`. 
+*huge* and takes *forever*). You could simply use the URL 
+`update:qt -qtwebengine`
 
 ![Filtering updates](https://github.com/k9spud/appswipe/assets/39664841/71df9665-d329-4db0-b6e1-d3b8238a0662)
 
