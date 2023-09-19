@@ -8,11 +8,11 @@ Easily manage your system's applications from a point and click user interface
 rather than typing out long command lines for installing, uninstalling, and 
 upgrading apps.
 
-![Screenshot](https://user-images.githubusercontent.com/39664841/139709601-35b9a8e7-e431-4631-98de-572ddafe5242.png)
+![Screenshot](https://github.com/k9spud/appswipe/assets/39664841/754e807d-4e57-457e-8d54-554d38e8a070)
 
-This program was written with Qt 5.15.8, ``sys-apps/portage-3.0.43-r1``, 
-``app-portage/portage-utils-0.94.3``, ``app-portage/gentoolkit-0.6.1-r3``, 
-``dev-libs/glib-2.74.4``, and ``lxde-base/lxterminal-0.4.0``.
+This program was written with Qt 5.15.10, ``sys-apps/portage-3.0.49-r2``, 
+``app-portage/portage-utils-0.96.1``, ``app-portage/gentoolkit-0.6.1-r3``, 
+``dev-libs/glib-2.76.4``, and ``lxde-base/lxterminal-0.4.0``.
 
 Installation
 ============
@@ -106,53 +106,46 @@ Keyboard Shortcuts
 
 `ALT-F` Opens the app menu.
 
-What's New in v1.1.41?
+What's New in v1.1.48?
 ======================
 
-New tabs/window management. Now you can drag and drop a tab from one window 
-to another, just like modern web browsers. 
+Added support for laptops that have no right mouse button. Now you can left 
+click and hold to trigger a "right click." 
 
-Right click or long press the "Open New Tab" button to access the window 
-management menu. You can rename each browser window to whatever name you'd 
-like to remember it by. Close the window, and later re-open that window 
-with all of it's multiple tabs intact. Saved windows are still remembered 
-even when you exit and re-start the app. Window maximized state now restores
-properly, including keeping the correct unmaximized window size intact when 
-the window is maximized.
+`View Updates` now filters out live ebuilds with version numbers
+9999, 99999, 999999, 9999999, 99999999, or 99999999 (just to be sure).
 
-The new tabs/window management is good for categorizing groups of related 
-apps together for looking at later. It helps reduce memory usage and
-screen clutter when closing windows that aren't important right now. 
-When you're finallycompletely done with a window and it's tabs, use 
-"Discard Window" to permanently close the window.
+The `View Updates` screen now features an `Upgrade` button to let you emerge
+all the upgradable packages that App Swipe can see. 
 
-Note: if you simply close a window (rather than "Discard"), the window is 
-saved for later use, but only if it has multiple tabs open. If you close a 
-window that has only one tab open, it is assumed that what you really mean 
-is that you don't care about that one tab anymore, so the window is 
-automatically permanently discarded.
+The `View Updates` URL input box now supports adding filters.
+Let's say you only want to see the subset of upgradable packages
+that contain the word `qt` for example. The URL `update:qt` will let you see
+only those packages, and the `Fetch` or `Upgrade` buttons on this page will 
+limit itself to only fetching or upgrading the `qt` subset as well. 
 
-USE flags are now hyperlinked when viewing an app. Clicking a USE flag
-link brings up descriptions for the USE flag and other apps that accept
-a USE flag by the same name. 
+You can also apply negative filters. Let's you want to upgrade Qt packages, 
+but you want to avoid `qtwebengine` for now (because that one is *huge* and
+takes *forever*).  You can simply use the URL 
+`update:qt -qtwebengine`. 
 
-An alternative "Who depends on this?" reverse dependencies command has been
-added. This one uses the `qdepends` command from `portage-utils` instead
-of `equery depends.` `qdepends` seems to be blazingly fast compared to
-`equery,` and it usually provides equally good info. Right click in the 
-whitespace (not on an hyperlink) when viewing an app to access this 
-alternate reverse dependencies lookup.
+![Filtering updates](https://github.com/k9spud/appswipe/assets/39664841/71df9665-d329-4db0-b6e1-d3b8238a0662)
 
-Added new "Install & rebuild reverse dependencies" command to app
-install right click menu. This option can sometimes come in handy 
-when `emerge` refuses to install an app because of dependency conflicts.
+`Update System` and `Update World` now add the `--changed-use` emerge flag. 
+This flag makes emerge pick up on packages that need re-building due to
+any new USE flag changes made to your portage configuration files.
 
-I fetch new apps to try out on my Raspberry Pi 4 often, and new apps almost 
-never keyword "arm64" off the bat. When "Fetch source" is used, App Swipe 
-now automatically adds the selected app to 
-`/etc/portage/package.accept_keywords/appswipe.tmp`. This is kind of a 
-hack -- but it's just too convenient for making fetch source "just go" no 
-matter what emerge thinks.
+We now trigger an automatic App Swipe database reload at the end of successful 
+`emerge --update` operations.
+
+Fixed a bug where the app could crash when saving state if there exists
+a newly opened window that has no tabs.
+
+Fixed a bug that made it impossible to view an app that has a name containing
+what might be a version number (but isn't). For example: 
+`media-fonts/font-bh-100dpi`.
+
+Added code for removing /tmp/AppSwipe.XXX temporary file after it's been used.
 
 License
 =======
