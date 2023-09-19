@@ -10,9 +10,13 @@ upgrading apps.
 
 ![Screenshot](https://github.com/k9spud/appswipe/assets/39664841/754e807d-4e57-457e-8d54-554d38e8a070)
 
-This program was written with Qt 5.15.10, ``sys-apps/portage-3.0.49-r2``, 
-``app-portage/portage-utils-0.96.1``, ``app-portage/gentoolkit-0.6.1-r3``, 
-``dev-libs/glib-2.76.4``, and ``lxde-base/lxterminal-0.4.0``.
+Help Get the Word Out
+=====================
+
+If you like this program, help us reach more people by clicking the `Star`
+button at the top of our [Github](https://github.com/k9spud/appswipe) page.
+It costs nothing and it helps App Swipe get listed higher up on the 
+Github search results when people are looking for this sort of thing.
 
 Installation
 ============
