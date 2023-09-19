@@ -124,9 +124,9 @@ that contain the word `qt` for example. The URL `update:qt` will let you see
 only those packages, and the `Fetch` or `Upgrade` buttons on this page will 
 limit itself to only fetching or upgrading the `qt` subset as well. 
 
-You can also apply negative filters. Let's you want to upgrade Qt packages, 
-but you want to avoid `qtwebengine` for now (because that one is *huge* and
-takes *forever*).  You can simply use the URL 
+You can also apply negative filters. Let's say you want to upgrade Qt 
+packages, but you want to avoid `qtwebengine` for now (because that one is 
+*huge* and takes *forever*). You can simply use the URL 
 `update:qt -qtwebengine`. 
 
 ![Filtering updates](https://github.com/k9spud/appswipe/assets/39664841/71df9665-d329-4db0-b6e1-d3b8238a0662)
@@ -141,11 +141,13 @@ We now trigger an automatic App Swipe database reload at the end of successful
 Fixed a bug where the app could crash when saving state if there exists
 a newly opened window that has no tabs.
 
-Fixed a bug that made it impossible to view an app that has a name containing
-what might be a version number (but isn't). For example: 
-`media-fonts/font-bh-100dpi`.
+Fixed a bug that made it impossible to view an app info page where the app name
+has what might be a version number (but actually isn't). For example 
+`media-fonts/font-bh-100dpi` would previously show a blank page when 
+trying to bring it up.
 
-Added code for removing /tmp/AppSwipe.XXX temporary file after it's been used.
+Added code for removing /tmp/AppSwipe.XXX temporary file after it has been 
+used.
 
 License
 =======
