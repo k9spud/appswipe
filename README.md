@@ -66,7 +66,8 @@ Keyboard Shortcuts
 
 `CTRL-T` Opens a new tab.
 
-`CTRL-W` Closes the current tab.
+`CTRL-W` Closes the current tab. Middle clicking on a tab's icon is another 
+way to close a tab.
 
 `CTRL-N` Opens a new window.
 
