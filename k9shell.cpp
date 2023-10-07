@@ -20,11 +20,63 @@
 #include <QTextStream>
 #include <QDebug>
 #include <QApplication>
+#include <QFileInfo>
 
 K9Shell* shell = nullptr;
 
 K9Shell::K9Shell(QObject *parent) : QProcess(parent)
 {
+    findAppSwipeBackend();
+}
+
+void K9Shell::findAppSwipeBackend()
+{
+    QFileInfo fi;
+    fi.setFile(qApp->applicationDirPath() + "/appswipebackend");
+    if(fi.exists())
+    {
+        appSwipeBackend = fi.canonicalFilePath();
+        qDebug() << appSwipeBackend;
+        return;
+    }
+
+    fi.setFile("/usr/bin/appswipebackend");
+    if(fi.exists())
+    {
+        appSwipeBackend = fi.canonicalFilePath();
+        qDebug() << appSwipeBackend;
+        return;
+    }
+
+    fi.setFile("/usr/local/bin/appswipebackend");
+    if(fi.exists())
+    {
+        appSwipeBackend = fi.canonicalFilePath();
+        qDebug() << appSwipeBackend;
+        return;
+    }
+    qDebug() << "Couldn't find appswipebackend binary!";
+}
+
+void K9Shell::findBzip2()
+{
+    QFileInfo fi;
+    fi.setFile("/bin/bzip2");
+    if(fi.exists())
+    {
+        bzip2 = fi.canonicalFilePath();
+        qDebug() << bzip2;
+        return;
+    }
+
+    fi.setFile("/usr/bin/bzip2");
+    if(fi.exists())
+    {
+        bzip2 = fi.canonicalFilePath();
+        qDebug() << bzip2;
+        return;
+    }
+    qDebug() << "Couldn't find bzip2 binary!";
 }
 
 void K9Shell::externalBrowser(QString url)
@@ -65,7 +117,7 @@ void K9Shell::externalTerm(QString script, QString title, bool waitSuccessful)
 
         if(cmd.contains("RET_CODE=$?") == false &&
            cmd.contains("qlop -Hp") == false &&
-           cmd.contains(QString("%1").arg(qApp->applicationFilePath())) == false)
+           cmd.contains(appSwipeBackend) == false)
         {
             out << "echo \"" << escaped << "\"\n";
         }

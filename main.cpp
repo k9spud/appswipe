@@ -21,25 +21,9 @@
 #include "browserwindow.h"
 #include "datastorage.h"
 #include "k9shell.h"
-#include "rescanthread.h"
 
-#include <signal.h>
 #include <QApplication>
 #include <QUrl>
-
-QCoreApplication* createApplication(int &argc, char *argv[])
-{
-    for (int i = 1; i < argc; ++i)
-    {
-        if(qstrcmp(argv[i], "-emerged") == 0 ||
-           qstrcmp(argv[i], "-synced") == 0 ||
-           qstrcmp(argv[i], "-pid") == 0)
-        {
-            return new QCoreApplication(argc, argv);
-        }
-    }
-    return new QApplication(argc, argv);
-}
 
 int main(int argc, char *argv[])
 {
@@ -48,7 +32,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("K9spud LLC");
     QCoreApplication::setApplicationName(APP_NAME);
     QCoreApplication::setApplicationVersion(APP_VERSION);
-    QScopedPointer<QCoreApplication> app(createApplication(argc, argv));
+    QApplication app(argc, argv);
 
     portage = new K9Portage();
     portage->setRepoFolder("/var/db/repos/");
@@ -56,81 +40,7 @@ int main(int argc, char *argv[])
     ds = new DataStorage();
     ds->openDatabase();
 
-    QApplication* a = qobject_cast<QApplication*>(app.data());
-    if(a)
-    {
-        a->setWindowIcon(QIcon(QStringLiteral(":/img/appicon.svg")));
-    }
-    else
-    {
-        bool emerged = false;
-        bool synced = false;
-        qint64 pid = -1;
-        QString atom;
-
-        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-        if(env.contains("RET_CODE"))
-        {
-            // abort if emerge process failed to actually do anything
-            int retCode = env.value("RET_CODE").toInt();
-            if(retCode != 0)
-            {
-                return retCode;
-            }
-        }
-
-        for (int i = 1; i < argc; ++i)
-        {
-            if(qstrcmp(argv[i], "-emerged") == 0)
-            {
-                i++;
-                if(i < argc)
-                {
-                    atom = argv[i];
-                    emerged = true;
-                }
-                continue;
-            }
-
-            if(qstrcmp(argv[i], "-synced") == 0)
-            {
-                synced = true;
-                continue;
-            }
-
-            if(qstrcmp(argv[i], "-pid") == 0)
-            {
-                i++;
-                if(i < argc)
-                {
-                    pid = atoll(argv[i]);
-                }
-                continue;
-            }
-        }
-
-        if(synced)
-        {
-            if(rescan == nullptr)
-            {
-                rescan = new RescanThread(nullptr);
-            }
-
-            rescan->abort = false;
-            rescan->reloadDatabase();
-        }
-        else if(emerged)
-        {
-            portage->reloadApp(atom);
-        }
-
-        if(pid != -1)
-        {
-            kill(pid, SIGHUP);
-        }
-        return 0;
-    }
-
+    app.setWindowIcon(QIcon(QStringLiteral(":/img/appicon.svg")));
     shell = new K9Shell();
 
     browser = new Browser();
@@ -156,7 +66,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    int retCode = app->exec();
+    int retCode = app.exec();
     delete browser;
     browser = nullptr;
 

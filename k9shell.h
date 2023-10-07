@@ -28,6 +28,12 @@ class K9Shell : public QProcess
 public:
     explicit K9Shell(QObject *parent = nullptr);
 
+    void findAppSwipeBackend();
+    QString appSwipeBackend;
+
+    void findBzip2();
+    QString bzip2;
+
 public slots:
     void externalBrowser(QString url);
     void externalTerm(QString cmd);
