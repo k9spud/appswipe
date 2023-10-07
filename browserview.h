@@ -76,12 +76,14 @@ public slots:
     void setUrl(const QUrl& url);
     void error(QString text);
     void reload(bool hardReload = true);
+    void stop();
 
     void viewAbout();
     void reloadingDatabase();
     void viewFile(QString fileName);
     void viewFolder(QString folderPath);
     void viewApp(const QUrl& url);
+    void viewProcess(QString cmd, QStringList options);
     void viewUseFlag(const QUrl& url);
     void viewAppFiles(const QUrl& url);
     void viewUpdates(QString action, QString filter);
@@ -96,6 +98,10 @@ protected slots:
 
     void quseProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void qlistProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void reloadProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void processFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void processReadStandardError(void);
+    void processReadStandardOutput(void);
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
@@ -121,6 +127,7 @@ protected:
     QString oldLink;
     QString context;
     QString useApp;
+    QString markdown;
     bool isWorld;
 
     void fetch(QSqlQuery* query);
