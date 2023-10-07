@@ -21,7 +21,6 @@
 #include <QProcessEnvironment>
 
 K9Portage* portage = nullptr;
-RescanThread* rescan = nullptr;
 Browser* browser = nullptr;
 
 QString fileSize(qint64 size)

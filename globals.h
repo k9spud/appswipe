@@ -20,7 +20,6 @@
 #include <QString>
 
 extern class K9Portage* portage;
-extern class RescanThread* rescan;
 extern class Browser* browser;
 
 QString fileSize(qint64 size);
