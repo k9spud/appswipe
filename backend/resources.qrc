@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>sql/createSettings.sql</file>
+    </qresource>
+</RCC>
