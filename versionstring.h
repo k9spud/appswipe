@@ -28,8 +28,7 @@ public:
     void parse(QString input);
 
     QString cut(int index);
-    QString cutNoRevision(int index);
-    QString revision();
+    QString cutInternalVx(int index);
 
     // Package version and revision (if any), for example 6.3, 6.3-r1.
     QString pvr;
@@ -41,13 +40,23 @@ public:
     // Package revision, or r0 if no revision exists.
     QString pr();
 
-    void greaterThanEqualToSQL(QString& clauses);
-    void lessThanEqualToSQL(QString& clauses);
-    void greaterThanSQL(QString& clauses);
-    void lessThanSQL(QString& clauses);
+    // Package revision without the r. Returns "0" if no revision exists.
+    QString revision();
 
-    QVector<QString> components;
-    QVector<QString> separators;
+    void greaterThanEqualToSQL(QString& clauses);
+    QString greaterThanEqualToSQL(int i);
+
+    void lessThanEqualToSQL(QString& clauses);
+    QString lessThanEqualToSQL(int i);
+
+    void greaterThanSQL(QString& clauses);
+    QString greaterThanSQL(int i);
+
+    void lessThanSQL(QString& clauses);
+    QString lessThanSQL(int i);
+
+    QVector<QString> components; //verCut compatible version components
+    QVector<QString> vx; // internal V1.V2.V3.V4.V5.rX version components
 
 protected:
     QString escapeSql(QString s);
