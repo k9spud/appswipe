@@ -39,11 +39,11 @@ K9Portage::K9Portage(QObject *parent) : QObject(parent)
     var_ref.setPattern("\\$\\{([A-z, 0-9, _]+)\\}");
 
     dependBasicRE.setPattern("([^~=><].*)/([^:\\n]+)$");
-    dependVersionRE.setPattern("(~|=|>=|>|<|<=)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*)");
+    dependVersionRE.setPattern("(~|=|>=|<=|>|<)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*)");
     dependSlotRE.setPattern("([^~=><].*)/([^:\\n]+):([^:\\n]+)");
-    dependRepositoryRE.setPattern("(~|=|>=|>|<|<=)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*):([^:]*):([^:\\n]+)");
+    dependRepositoryRE.setPattern("(~|=|>=|<=|>|<)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*):([^:]*):([^:\\n]+)");
 
-    dependLinkRE.setPattern("(!~|!=|!>=|!<=|!>|!<|~|=|>=|>|<|<=|)(.+)/(.+)-([0-9\\*][^\\n]*)");
+    dependLinkRE.setPattern("(!~|!=|!>=|!<=|!>|!<|~|=|>=|<=|>|<)(.+)/(.+)-([0-9\\*][^\\n]*)");
     dependLinkSlotRE.setPattern("(.+)/(.+):([^\\n]+)");
     dependLinkAppRE.setPattern("(!|)(.+)/([^\\[\\]\\n]+)(\\[[^\\n]+\\]|)");
 
@@ -167,7 +167,7 @@ void K9Portage::parseVerCut(QString& value)
 
 // refer to https://web.archive.org/web/20201112040501/https://wiki.gentoo.org/wiki/Version_specifier
 // for DEPEND atom syntax
-void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
+void K9Portage::readMaskFile(QSqlQuery& query, QString fileName, QString atomFilter)
 {
     QFile input;
     input.setFileName(fileName);
@@ -199,6 +199,12 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
         {
             continue;
         }
+
+        if(atomFilter.isEmpty() == false && s.contains('*') == false && s.contains(atomFilter) == false)
+        {
+            continue;
+        }
+
         clauses.clear();
         match = dependVersionRE.match(s);
         if(match.hasMatch())
@@ -705,6 +711,7 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
                 if(repo != "%" && repo.isEmpty() == false)
                 {
                     query.addBindValue(repo);
+                    repo.clear();
                 }
 
                 if(query.exec() == false)
@@ -727,7 +734,7 @@ void K9Portage::readMaskFile(QString fileName, QSqlQuery& query)
     }
 }
 
-void K9Portage::reloadApp(QString app)
+void K9Portage::emergedApp(QString app)
 {
     QSqlDatabase db;
     if(QSqlDatabase::contains("GuiThread") == false)
@@ -836,7 +843,7 @@ void K9Portage::reloadApp(QString app)
     }
 }
 
-void K9Portage::applyMasks(QSqlDatabase& db)
+void K9Portage::applyMasks(QSqlDatabase& db, QString atomFilter)
 {
     QDir dir;
 
@@ -847,12 +854,12 @@ void K9Portage::applyMasks(QSqlDatabase& db)
     dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
     foreach(QString maskFile, dir.entryList())
     {
-        readMaskFile(QString("%1/%2").arg(dir.path(), maskFile), query);
+        readMaskFile(query, QString("%1/%2").arg(dir.path(), maskFile), atomFilter);
     }
 
     foreach(QString repo, repos)
     {
-        readMaskFile(QString("%1profiles/package.mask").arg(repo), query);
+        readMaskFile(query, QString("%1profiles/package.mask").arg(repo), atomFilter);
     }
 
     db.commit();

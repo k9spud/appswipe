@@ -71,9 +71,9 @@ public:
 
     QString linkDependency(QString input);
 
-    void applyMasks(QSqlDatabase& db);
-    void readMaskFile(QString fileName, QSqlQuery& query);
-    void reloadApp(QString app);
+    void applyMasks(QSqlDatabase& db, QString atomFilter = "");
+    void readMaskFile(QSqlQuery& query, QString fileName, QString atomFilter = "");
+    void emergedApp(QString app);
 
     enum PackageStatus
     {
