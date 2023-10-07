@@ -109,10 +109,10 @@ void CompositeView::navigateTo(QString text, bool changeHistory, bool feelingLuc
     if(text.startsWith("file:"))
     {
         QString fileType = text.mid(text.lastIndexOf('.') + 1);
-        QStringList imageFormats;
-        imageFormats << "jpg" << "jpeg" << "png" << "gif" << "pbm" << "bmp" << "pgm" << "ppm" << "xbm" << "xpm" << "svg";
-        imageFormats << "icns" << "jp2" << "mng" << "tga" << "tiff" << "wbmp" << "webp";
-        if(imageFormats.contains(fileType, Qt::CaseInsensitive))
+        QStringList formats;
+        formats << "jpg" << "jpeg" << "png" << "gif" << "pbm" << "bmp" << "pgm" << "ppm" << "xbm" << "xpm" << "svg";
+        formats << "icns" << "jp2" << "mng" << "tga" << "tiff" << "wbmp" << "webp";
+        if(formats.contains(fileType, Qt::CaseInsensitive))
         {
             QUrl url(text);
             History::State state;
@@ -472,6 +472,14 @@ void CompositeView::back()
 {
     saveScrollPosition();
     history->back();
+}
+
+void CompositeView::stop()
+{
+    if(browserView != nullptr)
+    {
+        browserView->stop();
+    }
 }
 
 void CompositeView::resizeEvent(QResizeEvent* event)

@@ -67,6 +67,7 @@ public slots:
     BrowserWindow* openWindow();
     void reloadDatabase();
     void reloadDatabaseComplete();
+    void reloadAppComplete();
     void viewUpdates();
     void switchToTab(int index);
     void enableChanged(History::WebAction action, bool enabled);

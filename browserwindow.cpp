@@ -17,7 +17,6 @@
 #include "browserwindow.h"
 #include "ui_browserwindow.h"
 #include "globals.h"
-#include "rescanthread.h"
 #include "main.h"
 #include "browser.h"
 #include "compositeview.h"
@@ -265,7 +264,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         {
             cmd.append(" --ask");
         }
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(qApp->applicationFilePath()).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(shell->appSwipeBackend).arg(qApp->applicationPid()));
 
         exec(cmd, "Sync Repos");
     });
@@ -307,7 +306,8 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         {
             cmd.append(" --ask");
         }
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(qApp->applicationFilePath()).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(shell->appSwipeBackend).arg(qApp->applicationPid()));
+
         exec(cmd, "Update System");
     });
     menu->addAction(action);
@@ -320,7 +320,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
         {
             cmd.append(" --ask");
         }
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(qApp->applicationFilePath()).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(shell->appSwipeBackend).arg(qApp->applicationPid()));
         exec(cmd, "Update World");
     });
     menu->addAction(action);
@@ -397,23 +397,11 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     tabsMenu->addSeparator();
 
     action = new QAction(tr("&Discard Window"), this);
-    action->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_F4));
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_F4));
     connect(action, &QAction::triggered, this, [this]()
     {
-        int ret = QMessageBox::warning(this, tr("Discard Window"),
-                                       tr("Are you sure you want to discard \"%2?\"\n"
-                                          "There are %1 tabs open.").arg(ui->tabWidget->count()).arg(objectName()),
-                                       QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Cancel);
-
-        if(ret == QMessageBox::Cancel)
-        {
-            return;
-        }
-        else if(ret == QMessageBox::Discard)
-        {
-            browser->discardWindow(windowId);
-            deleteLater();
-        }
+        browser->discardWindow(windowId);
+        deleteLater();
     });
     tabsMenu->addAction(action);
     addAction(action);
@@ -488,6 +476,19 @@ void BrowserWindow::on_menuButton_pressed()
     menu->exec(point);
 }
 
+void BrowserWindow::reloadAppComplete()
+{
+    BrowserView* view = qobject_cast<BrowserView*>(sender());
+
+    disconnect(view, &BrowserView::loadFinished, this, &BrowserWindow::reloadAppComplete);
+    disconnect(view, &BrowserView::loadProgress, ui->searchProgress, &QProgressBar::setValue);
+    workFinished();
+
+    currentView()->reload(false);
+    setWorking(false);
+    ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), currentView()->icon());
+}
+
 void BrowserWindow::on_reloadButton_clicked()
 {
     if(working)
@@ -502,24 +503,34 @@ void BrowserWindow::on_reloadButton_clicked()
 
         bool hardReload = QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ShiftModifier) ||
                           QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ControlModifier);
+        if(hardReload)
+        {
+            view->setStatus("Reloading...");
+            connect(view->browser(), &BrowserView::loadFinished, this, &BrowserWindow::reloadAppComplete);
+            connect(view->browser(), &BrowserView::loadProgress, ui->searchProgress, &QProgressBar::setValue);
+            setWorking(true);
+        }
         view->reload(hardReload);
         ui->lineEdit->setText(view->url());
-        disconnect(view, SIGNAL(loadProgress(int)), ui->searchProgress, SLOT(setValue(int)));
-        setWorking(false);
-        ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), view->icon());
+        if(hardReload == false)
+        {
+            disconnect(view, SIGNAL(loadProgress(int)), ui->searchProgress, SLOT(setValue(int)));
+            setWorking(false);
+            ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), view->icon());
+        }
     }
 }
 
 void BrowserWindow::stop()
 {
-    if(rescan != nullptr)
+    CompositeView* view = currentView();
+    if(view != nullptr)
     {
-        rescan->abort = true;
-    }
-    if(working == false)
-    {
-        CompositeView* view = currentView();
-        if(view != nullptr)
+        if(working)
+        {
+            view->stop();
+        }
+        else
         {
             view->setStatus("");
         }
@@ -552,6 +563,7 @@ void BrowserWindow::setWorking(bool workin)
     if(workin)
     {
         ui->reloadButton->setIcon(stopIcon);
+        ui->reloadButton->setToolTip("Stop");
         working = true;
 
         ui->searchProgress->setVisible(true);
@@ -560,6 +572,7 @@ void BrowserWindow::setWorking(bool workin)
     else
     {
         ui->reloadButton->setIcon(reloadIcon);
+        ui->reloadButton->setToolTip("Reload");
         working = false;
 
         ui->searchProgress->setVisible(false);
@@ -779,26 +792,37 @@ BrowserWindow* BrowserWindow::openWindow()
 
 void BrowserWindow::reloadDatabase()
 {
-    setWorking(true);
-    if(rescan == nullptr)
+    if(shell->appSwipeBackend.isEmpty())
     {
-        rescan = new RescanThread(this);
+        shell->findAppSwipeBackend();
+        if(shell->appSwipeBackend.isEmpty())
+        {
+            QMessageBox::critical(this, tr("Error"), tr("Could not find '/usr/bin/appswipebackend' binary."));
+            return;
+        }
     }
 
-    connect(rescan, SIGNAL(progress(int)), ui->searchProgress, SLOT(setValue(int)));
-    connect(rescan, SIGNAL(finished()), this, SLOT(reloadDatabaseComplete()));
+    setWorking(true);
 
-    currentView()->saveScrollPosition();
-    currentView()->reloadingDatabase();
-    currentView()->setStatus("Loading package database...");
+    CompositeView* view = currentView();
+    view->saveScrollPosition();
+    view->reloadingDatabase();
+    view->setStatus("");
     setWindowTitle(QString("%1 v%2").arg(APP_NAME, APP_VERSION));
-    rescan->rescan();
+    connect(view->browser(), &BrowserView::loadFinished, this, &BrowserWindow::reloadDatabaseComplete);
+    connect(view->browser(), &BrowserView::loadProgress, ui->searchProgress, &QProgressBar::setValue);
+    QStringList options;
+    options << "-progress" << "-synced" << "-pid" << QString::number(qApp->applicationPid());
+
+    view->browser()->viewProcess(shell->appSwipeBackend, options);
 }
 
 void BrowserWindow::reloadDatabaseComplete()
 {
-    disconnect(rescan, SIGNAL(progress(int)), ui->searchProgress, SLOT(setValue(int)));
-    disconnect(rescan, SIGNAL(finished()), this, SLOT(reloadDatabaseComplete()));
+    BrowserView* view = qobject_cast<BrowserView*>(sender());
+    disconnect(view, &BrowserView::loadFinished, this, &BrowserWindow::reloadDatabaseComplete);
+    disconnect(view, &BrowserView::loadProgress, ui->searchProgress, &QProgressBar::setValue);
+
     workFinished();
 
     currentView()->reload(false);

@@ -80,6 +80,7 @@ public slots:
 
     void forward();
     void back();
+    void stop();
     void stateChanged(const History::State& s);
     void navigateTo(QString text, bool changeHistory = true, bool feelingLucky = false);
     void jumpTo(const History::State& s);
