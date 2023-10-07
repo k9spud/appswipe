@@ -24,7 +24,6 @@ SOURCES += \
     k9shell.cpp \
     k9tabbar.cpp \
     main.cpp \
-    rescanthread.cpp \
     tabwidget.cpp \
     versionstring.cpp
 
@@ -44,7 +43,6 @@ HEADERS += \
     k9shell.h \
     k9tabbar.h \
     main.h \
-    rescanthread.h \
     tabwidget.h \
     versionstring.h
 
