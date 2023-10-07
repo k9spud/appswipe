@@ -18,7 +18,7 @@ create table if not exists META (
     SCHEMAVERSION integer,
     UUID text
 );
-insert into META(SCHEMAVERSION) SELECT 4 WHERE NOT EXISTS(SELECT 0 FROM META);
+insert into META(SCHEMAVERSION) SELECT 5 WHERE NOT EXISTS(SELECT 0 FROM META);
 
 create table if not exists WINDOW (
     WINDOWID integer primary key,
@@ -68,6 +68,10 @@ create table if not exists PACKAGE (
     V4 int,
     V5 int,
     V6 int,
+    V7 int,
+    V8 int,
+    V9 int,
+    V10 int,
     SLOT text,
     LICENSE text,
     INSTALLED integer,

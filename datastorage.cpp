@@ -183,7 +183,7 @@ QString DataStorage::openDatabase()
             schemaVersion = query.value(0).toInt();
         }
 
-        if(schemaVersion < 4)
+        if(schemaVersion < 5)
         {
             upgradeDatabase(query, db, schemaVersion);
         }
@@ -218,6 +218,36 @@ bool DataStorage::upgradeDatabase(QSqlQuery& query, QSqlDatabase& db, int schema
     }
 
     db.transaction();
+
+    if(schemaVersion < 5)
+    {
+        if(query.exec("alter table PACKAGE add column V7 int") == false)
+        {
+            qDebug() << "Couldn't add column PACKAGE.V7 upgrading from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+
+        if(query.exec("alter table PACKAGE add column V8 int") == false)
+        {
+            qDebug() << "Couldn't add column PACKAGE.V8 upgrading from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+        if(query.exec("alter table PACKAGE add column V9 int") == false)
+        {
+            qDebug() << "Couldn't add column PACKAGE.V9 upgrading from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+        if(query.exec("alter table PACKAGE add column V10 int") == false)
+        {
+            qDebug() << "Couldn't add column PACKAGE.V10 upgrading from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+        emptyDatabase = true;
+    }
 
     if(schemaVersion < 4)
     {
@@ -268,7 +298,7 @@ bool DataStorage::upgradeDatabase(QSqlQuery& query, QSqlDatabase& db, int schema
         return false;
     }
 
-    int finalVersion = 4;
+    int finalVersion = 5;
     query.prepare("update META set UUID=ifnull(UUID,?), SCHEMAVERSION=?");
     query.bindValue(0, QUuid::createUuid().toString(QUuid::WithoutBraces));
     query.bindValue(1, finalVersion);
