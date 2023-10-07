@@ -77,7 +77,7 @@ way to close a tab.
 
 `F2` Allows you to rename the current window.
 
-`CTRL-ALT-F4` Permanently discards the current window.
+`CTRL-F4` Permanently discards the current window.
 
 `CTRL-TAB` Displays the next tab.
 
@@ -110,6 +110,57 @@ way to close a tab.
 `Escape` Reserved for stopping long running browser view operations (probably inoperable at the moment, since we don't have any such slow operations, right?)
 
 `ALT-F` Opens the app menu.
+
+What's New in v1.1.52?
+======================
+
+Split off database reload code into a separate command line program, 
+`appswipebackend`. Going forward, more and more code should be moved
+into the backend so that only the bare essential code needed to keep the
+GUI displayed is kept in resident memory.
+
+Database loading code now supports capturing data from the repo's 
+`metadata/md5-cache/` instead of trying to parse the data out of .ebuild 
+files. This solves a lot of problems with slot numbers that were previously
+showing bad data because the .ebuild files often do a lot of scripting
+with regards to declaring a slot number. App Swipe will still continue to
+fall back to parsing .ebuild files if the repo does not have metadata cache.
+
+Now supports displaying bzip2 compressed files. 
+Now supports displaying text files with markdown formatting.
+
+Now does a better job of sorting packages by version number. Previously, 
+version numbers containing alpha, beta, pre, rc (basically, any sort of 
+"pre-release") could end up sorting out as being newer than the final 
+release.
+
+Fixed a bug in applying masks to the right versions when using the `<=` 
+operator. 
+
+Now supports packages with excessive tuples in the version string
+(such as `net-ftp/ftp-0.17.34.0.2.5.1`). The SQL database schema now supports
+up to 10 tuples maximum.
+
+Available USE flags (IUSE) now shows the latest available set from 
+the latest release in the repo rather than showing what the available USE
+flags were for that package at install. This seems more useful, as it may let
+you know more about what's really available out there. 
+
+Found some packages where the same IUSE flag is listed multiple times - we 
+now remove duplicates so App Swipe's display is less cluttered.
+
+We now filter out USE flags that aren't in the package's available IUSE flags
+list. This cleans up the display of extraneous USE flags that seem more like
+internal portage flags than actual options for the user.
+
+Hard reload (CTRL-R) when viewing an app page no longer blindly reloads all 
+mask files like it used to. Instead, we only execute SQL updates
+for the masks that contain this app's atom string. This makes hard 
+reload work a lot faster while most likely still providing the same results.
+
+Pressing Return while a link is highlighted in the browser view now triggers
+navigating to the linked page. This keyboard shortcut comes in handy after 
+doing a CTRL-F search for a particular package.
 
 What's New in v1.1.48?
 ======================
