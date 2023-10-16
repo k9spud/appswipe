@@ -52,31 +52,28 @@ int main(int argc, char *argv[])
     bool synced = false;
     bool reload = false;
     qint64 pid = -1;
-    QString atom;
-    QString reloadAtom;
+    QStringList atoms;
 
     for (int i = 1; i < argc; ++i)
     {
         if(qstrcmp(argv[i], "-emerged") == 0)
         {
-            i++;
-            if(i < argc)
+            while(++i < argc)
             {
-                atom = argv[i];
+                atoms << argv[i];
                 emerged = true;
             }
-            continue;
+            break;
         }
 
         if(qstrcmp(argv[i], "-reload") == 0)
         {
-            i++;
-            if(i < argc)
+            while(++i < argc)
             {
-                reloadAtom = argv[i];
+                atoms << argv[i];
                 reload = true;
             }
-            continue;
+            break;
         }
 
         if(qstrcmp(argv[i], "-progress") == 0)
@@ -109,6 +106,7 @@ int main(int argc, char *argv[])
             rescan = new RescanThread(nullptr);
         }
 
+        output << APP_NAME << " v" << APP_VERSION << Qt::endl;
         rescan->abort = false;
         rescan->reloadDatabase();
     }
@@ -116,12 +114,18 @@ int main(int argc, char *argv[])
     {
         if(emerged)
         {
-            portage->emergedApp(atom);
+            foreach(QString s, atoms)
+            {
+                portage->emergedApp(s);
+            }
         }
 
         if(reload)
         {
-            rescan->reloadApp(reloadAtom);
+            foreach(QString s, atoms)
+            {
+                rescan->reloadApp(s);
+            }
         }
     }
 
