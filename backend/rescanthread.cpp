@@ -636,20 +636,21 @@ bool RescanThread::importRepoPackage(QSqlQuery* query, QString category, QString
     QString installedFilePath;
     QString slot;
     QString subslot;
-    int downloadSize = -1;
+    int downloadSize;
     qint64 published = 0;
     qint64 status = K9Portage::UNKNOWN;
     QString keywords;
     QStringList keywordList;
     qint64 installed = 0;
-    QFile input;
     QFileInfo fi;
+    QFile input;
+    QString data;
+    bool ok;
 
     portage->vars.clear();
     portage->vars["PN"] = packageName;
     portage->setVersion(ebuildFilePath.mid(packageName.length() + 1, ebuildFilePath.length() - (7 + packageName.length() + 1)));
 
-    downloadSize = -1;
     installed = 0;
     installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(category, packageName, portage->version.pvr);
     fi.setFile(installedFilePath);
@@ -662,6 +663,20 @@ bool RescanThread::importRepoPackage(QSqlQuery* query, QString category, QString
     published = fi.birthTime().toSecsSinceEpoch();
 
     portage->ebuildReader(buildsPath + "/" + ebuildFilePath);
+
+    downloadSize = -1;
+    input.setFileName(QString("%1/SIZE").arg(buildsPath));
+    if(input.open(QIODevice::ReadOnly))
+    {
+        data = input.readAll();
+        input.close();
+        data = data.trimmed();
+        downloadSize = data.toInt(&ok);
+        if(ok == false)
+        {
+            downloadSize = -1;
+        }
+    }
 
     keywords = portage->var("KEYWORDS").toString();
     keywordList = keywords.split(' ');
@@ -731,19 +746,20 @@ bool RescanThread::importMetaCache(QSqlQuery* query, QString category, QString p
     QString installedFilePath;
     QString slot;
     QString subslot;
-    int downloadSize = -1;
+    int downloadSize;
     qint64 status = K9Portage::UNKNOWN;
     QString keywords;
     QStringList keywordList;
     qint64 installed = 0;
-    QFile input;
     QFileInfo fi;
+    QFile input;
+    QString data;
+    bool ok;
 
     portage->vars.clear();
     portage->vars["PN"] = packageName;
     portage->setVersion(version);
 
-    downloadSize = -1;
     installed = 0;
     installedFilePath = QString("/var/db/pkg/%1/%2-%3").arg(category, packageName, portage->version.pvr);
     fi.setFile(installedFilePath);
@@ -753,6 +769,20 @@ bool RescanThread::importMetaCache(QSqlQuery* query, QString category, QString p
     }
 
     portage->ebuildReader(metaCacheFilePath);
+
+    downloadSize = -1;
+    input.setFileName(QString("/var/db/pkg/%1/%2-%3/SIZE").arg(category, packageName,  portage->version.pvr));
+    if(input.open(QIODevice::ReadOnly))
+    {
+        data = input.readAll();
+        input.close();
+        data = data.trimmed();
+        downloadSize = data.toInt(&ok);
+        if(ok == false)
+        {
+            downloadSize = -1;
+        }
+    }
 
     keywords = portage->var("KEYWORDS").toString();
     keywordList = keywords.split(' ');
