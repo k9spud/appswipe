@@ -295,9 +295,11 @@ void BrowserView::setUrl(const QUrl& url)
     else if(scheme == "install")
     {
         QString app = url.path(QUrl::FullyDecoded);
+        portage->autoKeyword(app);
+
         QString cmd;
         cmd = QString("qlop -Hp =%1\n").arg(app);
-        cmd.append("sudo emerge =" + app + " --newuse --verbose --verbose-conflicts --nospinner");
+        cmd.append(QString("%1 /usr/bin/emerge =%2 --newuse --verbose --verbose-conflicts --nospinner").arg(shell->doas, app));
         if(isWorld == false)
         {
             cmd.append(" --oneshot");
@@ -310,7 +312,7 @@ void BrowserView::setUrl(const QUrl& url)
 
         QString appPathName = appNoVersion(app);
 
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -emerged %2 -pid %3").arg(shell->appSwipeBackend, appPathName).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged %2").arg(shell->backend, appPathName).arg(qApp->applicationPid()));
 
         composite->window->exec(cmd, QString("%1 install").arg(app));
         composite->window->install(app, isWorld);
@@ -318,14 +320,14 @@ void BrowserView::setUrl(const QUrl& url)
     else if(scheme == "uninstall")
     {
         QString app = url.path(QUrl::FullyDecoded);
-        QString cmd = "sudo emerge --unmerge =" + app + " --nospinner --noreplace";
+        QString cmd = QString("%1 /usr/bin/emerge --unmerge =%2 --nospinner --noreplace").arg(shell->doas, app);
         if(composite->window->ask)
         {
             cmd.append(" --ask");
         }
 
         QString appPathName = appNoVersion(app);
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -emerged %2 -pid %3").arg(shell->appSwipeBackend, appPathName).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged %2").arg(shell->backend, appPathName).arg(qApp->applicationPid()));
 
         composite->window->exec(cmd, QString("%1 uninstall").arg(app));
         composite->window->uninstall(app);
@@ -333,12 +335,12 @@ void BrowserView::setUrl(const QUrl& url)
     else if(scheme == "unmask")
     {
         QString app = url.path(QUrl::FullyDecoded);
-        QString cmd = "sudo emerge --autounmask --autounmask-write =" + app + " --verbose --verbose-conflicts --nospinner";
+        QString cmd = QString("%1 /usr/bin/emerge --autounmask --autounmask-write =%2 --verbose --verbose-conflicts --nospinner").arg(shell->doas, app);
         if(composite->window->ask)
         {
             cmd.append(" --ask");
         }
-        cmd.append(" && sudo dispatch-conf && sudo emerge =" + app + " --verbose --verbose-conflicts --nospinner");
+        cmd.append(QString(" && %1 /usr/sbin/dispatch-conf && %1 /usr/bin/emerge =%2 --verbose --verbose-conflicts --nospinner").arg(shell->doas, app));
         if(composite->window->ask)
         {
             cmd.append(" --ask");
@@ -402,6 +404,111 @@ void BrowserView::reload(bool hardReload)
 
         navigateTo(currentUrl, false);
     }
+}
+
+QString BrowserView::printDependencies(QStringList dependencies, QSqlQuery& query, bool flagMissing)
+{
+    QString s;
+    QString category;
+    QString package;
+    QStringList atoms;
+    if(flagMissing)
+    {
+        for(int i = 0; i < dependencies.count(); i++)
+        {
+            s = dependencies.at(i);
+            category.clear();
+            package.clear();
+            s = portage->linkDependency(s, category, package);
+            if(category.count() && package.count())
+            {
+                s = category;
+                s.append('/');
+                s.append(package);
+                if(atoms.contains(s) == false)
+                {
+                    atoms.append(s);
+                }
+            }
+        }
+
+        s = R"EOF(
+select c.CATEGORY, p.PACKAGE, p.VERSION from PACKAGE p
+inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID
+where p.INSTALLED != 0 and c.CATEGORY || '/' || p.PACKAGE in (
+)EOF";
+
+        if(atoms.count() > 0)
+        {
+            QString q = ",?";
+
+            s.append('?');
+            s.append(q.repeated(atoms.count() - 1));
+            s.append(")");
+
+            query.prepare(s);
+            foreach(s, atoms)
+            {
+                query.addBindValue(s);
+            }
+
+            if(query.exec() && query.first())
+            {
+                do
+                {
+                    s = QString("%1/%2").arg(query.value(0).toString(), query.value(1).toString());
+                    atoms.removeAll(s);
+                } while(query.next());
+            }
+        }
+    }
+
+    QString html;
+    bool newline = false;
+    int parens = 0;
+    for(int i = 0; i < dependencies.count(); i++)
+    {
+        s = dependencies.at(i);
+        s = portage->linkDependency(s.replace(',', ' '), category, package);
+
+        if(newline)
+        {
+            html.append("<BR>\n");
+        }
+
+        if(s == "(")
+        {
+            for(int j = 0; j <= parens; j++)
+            {
+                html.append("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
+            }
+            parens++;
+        }
+        else
+        {
+            if(s == ")")
+            {
+                parens--;
+            }
+
+            for(int j = 0; j <= parens; j++)
+            {
+                html.append("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
+            }
+        }
+
+        if(flagMissing && atoms.contains(QString("%1/%2").arg(category, package)))
+        {
+            html.append(s.replace("<LINKCOLOR>", "STYLE=\"color: #fb9f9f\""));
+        }
+        else
+        {
+            html.append(s.replace("<LINKCOLOR>", ""));
+        }
+        newline = true;
+    }
+
+    return html;
 }
 
 void BrowserView::viewApp(const QUrl& url)
@@ -486,7 +593,6 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     QStringList installtimeDeps;
     int firstUnmasked = -1;
 
-    QHash<QString, QString> installedVersions;
     QString versionSize;
 
     QFile input;
@@ -498,7 +604,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     if(foundApp)
     {
         while(1)
-        {            
+        {
             installed = query.value(4).toBool();
             if(version.isEmpty() == false)
             {
@@ -545,68 +651,90 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
 
         appicon = findAppIcon(hasIcon, category, package, version);
 
-        s = QString("/var/db/pkg/%1/%2-%3/USE").arg(category, package, version);
-        input.setFileName(s);
-        if(input.open(QIODevice::ReadOnly))
-        {
-            useFlags = input.readAll();
-            input.close();
-        }
+        description = query.value(3).toString();
+        homePage = query.value(7).toString();
+        license = query.value(8).toString();
+        keywords = query.value(9).toString();
+        category = query.value(11).toString();
+        package = query.value(12).toString();
+        installed = query.value(4).toBool();
+        repo = query.value(0).toString();
 
-        s = QString("/var/db/pkg/%1/%2-%3/CFLAGS").arg(category, package, version);
-        input.setFileName(s);
-        if(input.open(QIODevice::ReadOnly))
+        if(installed)
         {
-            cFlags = input.readAll();
-            input.close();
-        }
+            s = QString("/var/db/pkg/%1/%2-%3/USE").arg(category, package, version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                useFlags = input.readAll();
+                input.close();
+            }
 
-        s = QString("/var/db/pkg/%1/%2-%3/CXXFLAGS").arg(category, package, version);
-        input.setFileName(s);
-        if(input.open(QIODevice::ReadOnly))
-        {
-            cxxFlags = input.readAll();
-            input.close();
-        }
+            s = QString("/var/db/pkg/%1/%2-%3/CFLAGS").arg(category, package, version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                cFlags = input.readAll();
+                input.close();
+            }
 
-        s = QString("/var/db/pkg/%1/%2-%3/DEPEND").arg(category, package, version);
-        input.setFileName(s);
-        if(input.open(QIODevice::ReadOnly))
-        {
-            installDepend = input.readAll();
-            input.close();
-        }
+            s = QString("/var/db/pkg/%1/%2-%3/CXXFLAGS").arg(category, package, version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                cxxFlags = input.readAll();
+                input.close();
+            }
 
-        s = QString("/var/db/pkg/%1/%2-%3/BDEPEND").arg(category, package, version);
-        input.setFileName(s);
-        if(input.open(QIODevice::ReadOnly))
-        {
-            buildDepend = input.readAll();
-            input.close();
-        }
+            s = QString("/var/db/pkg/%1/%2-%3/DEPEND").arg(category, package, version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                installDepend = input.readAll();
+                input.close();
+            }
 
-        s = QString("/var/db/pkg/%1/%2-%3/RDEPEND").arg(category, package, version);
-        input.setFileName(s);
-        if(input.open(QIODevice::ReadOnly))
-        {
-            runDepend = input.readAll();
-            input.close();
-        }
+            s = QString("/var/db/pkg/%1/%2-%3/BDEPEND").arg(category, package, version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                buildDepend = input.readAll();
+                input.close();
+            }
 
-        s = QString("/var/db/pkg/%1/%2-%3/PDEPEND").arg(category, package, version);
-        input.setFileName(s);
-        if(input.open(QIODevice::ReadOnly))
-        {
-            postDepend = input.readAll();
-            input.close();
-        }
+            s = QString("/var/db/pkg/%1/%2-%3/RDEPEND").arg(category, package, version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                runDepend = input.readAll();
+                input.close();
+            }
 
-        s = QString("/var/db/pkg/%1/%2-%3/BUILD_TIME").arg(category, package, version);
-        input.setFileName(s);
-        if(input.open(QIODevice::ReadOnly))
+            s = QString("/var/db/pkg/%1/%2-%3/PDEPEND").arg(category, package, version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                postDepend = input.readAll();
+                input.close();
+            }
+
+            s = QString("/var/db/pkg/%1/%2-%3/BUILD_TIME").arg(category, package, version);
+            input.setFileName(s);
+            if(input.open(QIODevice::ReadOnly))
+            {
+                lastBuilt = input.readAll();
+                input.close();
+            }
+        }
+        else
         {
-            lastBuilt = input.readAll();
-            input.close();
+            s = QString("/var/db/repos/%1/metadata/md5-cache/%2/%3-%4").arg(repo, category, package, version);
+            portage->vars.clear();
+            portage->ebuildReader(s);
+            installDepend = portage->var("DEPEND").toString();
+            buildDepend = portage->var("BDEPEND").toString();
+            runDepend = portage->var("RDEPEND").toString();
+            postDepend = portage->var("PDEPEND").toString();
         }
 
         s = QString("/var/lib/portage/world");
@@ -621,8 +749,6 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             }
         }
 
-        description = query.value(3).toString();
-        homePage = query.value(7).toString();
         if(homePage.contains(' '))
         {
             QStringList pages = homePage.split(' ');
@@ -636,10 +762,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
         {
             homePage = QString("<A HREF=\"%1\">%1</A>").arg(homePage);
         }
-        license = query.value(8).toString();
-        keywords = query.value(9).toString();
-        category = query.value(11).toString();
-        package = query.value(12).toString();
+
         if(hasIcon == false)
         {
             QString cat = category.left(category.indexOf('-'));
@@ -683,24 +806,23 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
         {
             repo = query.value(0).toString();
             version = query.value(2).toString();
-            installed = query.value(4).toBool();
+            int rowInstalled = query.value(4).toBool();
             obsoleted = query.value(5).toBool();
             masked = query.value(13).toBool();
             rowId = query.value(15).toInt();
             slot = query.value(6).toString();
             subslot = query.value(16).toString();
             downloadSize = query.value(14).toInt();
-            if(downloadSize != -1)
+            if(downloadSize > 0)
             {
-                installedSize = fileSize(downloadSize);
-                installedSize.prepend(", ");
+                installedSize = QString(": <A HREF=\"files:%1/%2-%3\">%4</A>").arg(category, package, version, fileSize(downloadSize));
             }
             else
             {
                 installedSize.clear();
             }
 
-            if(installed)
+            if(rowInstalled)
             {
                 ebuild = QString("/var/db/pkg/%1/%2-%3/%2-%3.ebuild").arg(category, package, version);
             }
@@ -739,8 +861,8 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             }
 
             s = s + (obsoleted ? " (obsolete" + installedSize + ")" :
-                     installed ? " (installed" + installedSize + ")" : "");
-            if(installed)
+                     rowInstalled ? " (installed" + installedSize + ")" : "");
+            if(rowInstalled)
             {
                 action = "uninstall";
             }
@@ -755,7 +877,6 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                     action = "install";
                 }
             }
-
 
             versionSize = QString("<A HREF=\"%1:%2/%3-%4\">%4</A>").arg(action, category, package, version);
             html.append("<TR>");
@@ -783,6 +904,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             html.append("</TR>\n");
         } while(query.next());
         html.append("</TABLE></P>\n");
+        query.clear();
 
         if(license.isEmpty() == false)
         {
@@ -901,107 +1023,60 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
 
         if(runDepend.isEmpty() == false)
         {
-            if(installDepend == runDepend)
-            {
-                html.append("<P><B>Dependencies:</B></P><UL>");
-            }
-            else
-            {
-                html.append("<P><B>Dependencies for run-time use:</B></P><UL>");
-            }
-
             runtimeDeps = runDepend.remove("\n").split(' ');
-            for(int i = 0; i < runtimeDeps.count(); i++)
+            if(runtimeDeps.count())
             {
-                s = portage->linkDependency(runtimeDeps.at(i));
-                if(i == 0)
+                if(installDepend == runDepend)
                 {
-                    html.append(s);
+                    html.append("<P><B>Dependencies:</B></P><P>");
                 }
                 else
                 {
-                    html.append(QString("<BR>\n%1").arg(s));
+                    html.append("<P><B>Dependencies for run-time use:</B></P><P>");
                 }
-            }
 
-            html.append("</UL>");
+                html.append(printDependencies(runtimeDeps, query, (installed == 0)));
+                html.append("</P>");
+            }
         }
 
         if(postDepend.isEmpty() == false)
         {
-            html.append("<P><B>Dependencies not strictly required at run-time:</B></P><UL>");
-
             optionalDeps = postDepend.remove("\n").split(' ');
-            for(int i = 0; i < optionalDeps.count(); i++)
+            if(optionalDeps.count())
             {
-                s = portage->linkDependency(optionalDeps.at(i));
-                if(i == 0)
-                {
-                    html.append(s);
-                }
-                else
-                {
-                    html.append(QString("<BR>\n%1").arg(s));
-                }
+                html.append("<P><B>Dependencies not strictly required at run-time:</B></P><P>");
+                html.append(printDependencies(optionalDeps, query, (installed == 0)));
+                html.append("</P>");
             }
-
-            html.append("</UL>");
         }
 
         if(installDepend.isEmpty() == false && runDepend != installDepend)
         {
             installtimeDeps = installDepend.remove("\n").split(' ');
-            bool first = true;
-            for(int i = 0; i < installtimeDeps.count(); i++)
+            removeDuplicateDeps(installtimeDeps, runtimeDeps);
+            removeDuplicateDeps(installtimeDeps, optionalDeps);
+            if(installtimeDeps.count())
             {
-                s = installtimeDeps.at(i);
-                if(runtimeDeps.contains(s) == false && optionalDeps.contains(s) == false) // don't show build dependencies that were already listed in the runtime depenencies list
-                {
-                    if(first)
-                    {
-                        html.append("<P><B>Dependencies for installing package:</B></P><UL>");
-                        html.append(portage->linkDependency(s));
-                        first = false;
-                    }
-                    else
-                    {
-                        html.append(QString("<BR>\n%1").arg(portage->linkDependency(s)));
-                    }
-                }
-            }
-
-            if(first == false)
-            {
-                html.append("</UL>");
+                html.append("<P><B>Dependencies for installing package:</B></P><P>");
+                html.append(printDependencies(installtimeDeps, query, (installed == 0)));
+                html.append("</P>");
             }
         }
 
         if(buildDepend.isEmpty() == false && runDepend != buildDepend)
         {
             QStringList deps = buildDepend.remove("\n").split(' ');
-            bool first = true;
-            for(int i = 0; i < deps.count(); i++)
+            removeDuplicateDeps(deps, runtimeDeps);
+            removeDuplicateDeps(deps, optionalDeps);
+            removeDuplicateDeps(deps, installtimeDeps);
+            if(deps.count())
             {
-                s = deps.at(i);
-                if(runtimeDeps.contains(s) == false  && optionalDeps.contains(s) == false && installtimeDeps.contains(s) == false) // don't show build dependencies that were already listed in the runtime/installtime depenencies list
-                {
-                    if(first)
-                    {
-                        html.append("<P><B>Dependencies for building from source:</B></P><UL>");
-                        html.append(portage->linkDependency(s));
-                        first = false;
-                    }
-                    else
-                    {
-                        html.append(QString("<BR>\n%1").arg(portage->linkDependency(s)));
-                    }
-                }
+                html.append("<P><B>Dependencies for building from source:</B></P><P>");
+                html.append(printDependencies(deps, query, (installed == 0)));
+                html.append("</P>");
             }
 
-            if(first == false)
-            {
-                html.append("</UL>");
-            }
         }
     }
 
@@ -1013,6 +1088,136 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     if(documentTitle() != oldTitle)
     {
         emit titleChanged(documentTitle());
+    }
+}
+
+int BrowserView::depMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex)
+{
+    if(targetIndex < 0 || sourceIndex < 0)
+    {
+        return -1;
+    }
+
+    int parens = 0;
+    int i = targetIndex;
+    int j = sourceIndex;
+    bool foundEnd = false;
+    QString s;
+    while(i < target.count() && j < source.count() && foundEnd == false)
+    {
+        s = target.at(i).trimmed();
+        if(s == "(")
+        {
+            parens++;
+        }
+        else if(s == ")")
+        {
+            parens--;
+            if(parens == 0)
+            {
+                foundEnd = true;
+            }
+        }
+
+        if(j >= source.count())
+        {
+            return -1;
+        }
+
+        if(s != source.at(j))
+        {
+            return -1;
+        }
+
+        i++;
+        j++;
+    }
+
+    targetIndex = i;
+    return i;
+}
+
+void BrowserView::skipNode(QStringList& nodes, int& index)
+{
+    int parens = 0;
+    QString s;
+    bool foundEnd = false;
+    while(index < nodes.count() && foundEnd == false)
+    {
+        s = nodes.at(index).trimmed();
+        if(s == "(")
+        {
+            parens++;
+        }
+        else if(s == ")")
+        {
+            parens--;
+            if(parens == 0)
+            {
+                foundEnd = true;
+            }
+        }
+        index++;
+    }
+}
+
+int BrowserView::outerDepMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex)
+{
+    QString s = target.at(targetIndex);
+    int j = source.indexOf(s, sourceIndex);
+    if(j < 0)
+    {
+        skipNode(target, targetIndex);
+        return -1;
+    }
+
+    int result = depMatch(target, targetIndex, source, j);
+    if(result >= 0)
+    {
+        return result;
+    }
+
+    skipNode(source, j);
+    return outerDepMatch(target, targetIndex, source, j);
+}
+
+void BrowserView::removeDuplicateDeps(QStringList& target, QStringList& source)
+{
+    int i = 0;
+    QString s;
+    int j;
+    int endMatch;
+    int removeStart;
+    int sourceSearch;
+    while(i < target.count())
+    {
+        s = target.at(i).trimmed();
+        if(s.endsWith('?') || s == "||")
+        {
+            removeStart = i;
+            sourceSearch = 0;
+            j = source.indexOf(s, sourceSearch);
+            endMatch = outerDepMatch(target, i, source, j);
+            if(endMatch >= 0)
+            {
+                j = removeStart;
+                i = removeStart;
+                while(i < target.count() && j < endMatch)
+                {
+                    target.removeAt(i);
+                    j++;
+                }
+            }
+
+            continue;
+        }
+        else if(source.contains(s))
+        {
+            // don't show target dependencies that are already listed in the source dependencies list
+            target.removeAt(i);
+            continue;
+        }
+        i++;
     }
 }
 
@@ -1558,10 +1763,10 @@ void BrowserView::reloadProcessFinished(int exitCode, QProcess::ExitStatus exitS
 void BrowserView::reloadApp(const QUrl& url)
 {
     QString atom = url.path(QUrl::FullyDecoded);
-    if(shell->appSwipeBackend.isEmpty())
+    if(shell->backend.isEmpty())
     {
-        shell->findAppSwipeBackend();
-        if(shell->appSwipeBackend.isEmpty())
+        shell->findBackend();
+        if(shell->backend.isEmpty())
         {
             QMessageBox::information(this, tr("Warning"), tr("Could not find '/usr/bin/appswipebackend' binary."));
             return;
@@ -1582,8 +1787,8 @@ void BrowserView::reloadApp(const QUrl& url)
     if(process->isOpen() == false)
     {
         QStringList options;
-        options << "-progress" << "-reload" << QString("\"%1%\"").arg(atom);
-        process->start(shell->appSwipeBackend, options, QIODevice::ReadWrite);
+        options << "-progress" << "-reload" << atom;
+        process->start(shell->backend, options, QIODevice::ReadWrite);
     }
 }
 
@@ -1903,7 +2108,7 @@ void BrowserView::mouseReleaseEvent(QMouseEvent* event)
 
         case Qt::MiddleButton:
             link = anchorAt(event->pos());
-            if(link.isEmpty() || textCursor().hasSelection())
+            if(link.isEmpty())
             {
                 QTextEdit::mouseReleaseEvent(event);
                 return;
@@ -2079,13 +2284,6 @@ void BrowserView::contextMenuUninstallLink(QMenu* menu, QString urlPath)
     });
     menu->addAction(action);
 
-    action = new QAction("List files owned", this);
-    connect(action, &QAction::triggered, this, [this, urlPath]()
-    {
-        navigateTo(QString("files:%1").arg(urlPath));
-    });
-    menu->addAction(action);
-
     action = new QAction("Who depends on this?", this);
     connect(action, &QAction::triggered, this, [urlPath]()
     {
@@ -2116,7 +2314,7 @@ void BrowserView::contextMenuUninstallLink(QMenu* menu, QString urlPath)
     {
         QString cmd;
         cmd = QString("qlop -Hp =%1\n").arg(urlPath);
-        cmd.append("sudo emerge =" + urlPath + " --verbose --verbose-conflicts --nospinner");
+        cmd.append(QString("%1 /usr/bin/emerge =%2 --verbose --verbose-conflicts --nospinner").arg(shell->doas, urlPath));
         if(isWorld == false)
         {
             cmd.append(" --oneshot");
@@ -2128,7 +2326,7 @@ void BrowserView::contextMenuUninstallLink(QMenu* menu, QString urlPath)
         }
 
         QString appPathName = appNoVersion(urlPath);
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -emerged %2 -pid %3").arg(shell->appSwipeBackend, appPathName).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged %2").arg(shell->backend, appPathName).arg(qApp->applicationPid()));
         composite->window->exec(cmd, QString("%1 reinstall").arg(urlPath));
     });
     menu->addAction(action);
@@ -2138,7 +2336,7 @@ void BrowserView::contextMenuUninstallLink(QMenu* menu, QString urlPath)
     {
         QString cmd;
         cmd = QString("qlop -Hp =%1\n").arg(urlPath);
-        cmd.append("sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --verbose --verbose-conflicts --nospinner");
+        cmd.append(QString("%1 /usr/bin/emerge =%2 --usepkg=n --getbinpkg=n --verbose --verbose-conflicts --nospinner").arg(shell->doas, urlPath));
         if(isWorld == false)
         {
             cmd.append(" --oneshot");
@@ -2150,7 +2348,7 @@ void BrowserView::contextMenuUninstallLink(QMenu* menu, QString urlPath)
         }
 
         QString appPathName = appNoVersion(urlPath);
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -emerged %2 -pid %3").arg(shell->appSwipeBackend, appPathName).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged %2").arg(shell->backend, appPathName).arg(qApp->applicationPid()));
         composite->window->exec(cmd, QString("%1 reinstall from source").arg(urlPath));
     });
     menu->addAction(action);
@@ -2161,7 +2359,7 @@ void BrowserView::contextMenuUninstallLink(QMenu* menu, QString urlPath)
         QString appPathName = appNoVersion(urlPath);
         QString cmd;
         cmd = QString("qlop -Hp =%1\n").arg(urlPath);
-        cmd.append(QString("sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =%1 `qdepends -QqqC -F \"=%[CATEGORY]%[PF]\" ^%2 | tr '\\n' ' '` --usepkg=n --verbose --verbose-conflicts --nospinner").arg(urlPath, appPathName));
+        cmd.append(QString("%1 /usr/bin/emerge =%2 `qdepends -QqqC -F \"=%[CATEGORY]%[PF]\" ^%3 | tr '\\n' ' '` --usepkg=n --getbinpkg=n --verbose --verbose-conflicts --nospinner").arg(shell->doas, urlPath, appPathName));
         cmd.append(" --oneshot");
 
         if(composite->window->ask)
@@ -2169,7 +2367,7 @@ void BrowserView::contextMenuUninstallLink(QMenu* menu, QString urlPath)
             cmd.append(" --ask");
         }
 
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -emerged %2 -pid %3").arg(shell->appSwipeBackend, appPathName).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged %2").arg(shell->backend, appPathName).arg(qApp->applicationPid()));
         composite->window->exec(cmd, QString("%1 install w/reverse dep rebuild").arg(urlPath));
     });
     menu->addAction(action);
@@ -2192,7 +2390,7 @@ void BrowserView::contextMenuInstallLink(QMenu* menu, QString urlPath)
         QString appPathName = appNoVersion(urlPath);
         QString cmd;
         cmd = QString("qlop -Hp =%1\n").arg(urlPath);
-        cmd.append(QString("sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =%1 `qdepends -QqqC -F \"=%[CATEGORY]%[PF]\" ^%2 | tr '\\n' ' '` --usepkg=n --verbose --verbose-conflicts --nospinner").arg(urlPath, appPathName));
+        cmd.append(QString("%1 /usr/bin/emerge =%2 `qdepends -QqqC -F \"=%[CATEGORY]%[PF]\" ^%3 | tr '\\n' ' '` --usepkg=n --getbinpkg=n --verbose --verbose-conflicts --nospinner").arg(shell->doas, urlPath, appPathName));
         cmd.append(" --oneshot");
 
         if(composite->window->ask)
@@ -2200,7 +2398,7 @@ void BrowserView::contextMenuInstallLink(QMenu* menu, QString urlPath)
             cmd.append(" --ask");
         }
 
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -emerged %2 -pid %3").arg(shell->appSwipeBackend, appPathName).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged %2").arg(shell->backend, appPathName).arg(qApp->applicationPid()));
         composite->window->exec(cmd, QString("%1 install w/reverse dep rebuild").arg(urlPath));
     });
     menu->addAction(action);
@@ -2210,7 +2408,7 @@ void BrowserView::contextMenuInstallLink(QMenu* menu, QString urlPath)
     {
         QString cmd;
         cmd = QString("qlop -Hp =%1\n").arg(urlPath);
-        cmd.append("sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --verbose --verbose-conflicts --nospinner");
+        cmd.append(QString("%1 /usr/bin/emerge =%2 --usepkg=n --verbose --verbose-conflicts --nospinner").arg(shell->doas, urlPath));
         if(isWorld == false)
         {
             cmd.append(" --oneshot");
@@ -2222,7 +2420,7 @@ void BrowserView::contextMenuInstallLink(QMenu* menu, QString urlPath)
         }
 
         QString appPathName = appNoVersion(urlPath);
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -emerged %2 -pid %3").arg(shell->appSwipeBackend, appPathName).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged %2").arg(shell->backend, appPathName).arg(qApp->applicationPid()));
         composite->window->exec(cmd, QString("%1 install from source").arg(urlPath));
     });
     menu->addAction(action);
@@ -2232,7 +2430,7 @@ void BrowserView::contextMenuInstallLink(QMenu* menu, QString urlPath)
     {
         QString cmd;
         cmd = QString("qlop -Hp =%1\n").arg(urlPath);
-        cmd.append("sudo emerge =" + urlPath + " --buildpkgonly --verbose --verbose-conflicts --nospinner");
+        cmd.append(QString("%1 /usr/bin/emerge =%2 --buildpkgonly --verbose --verbose-conflicts --nospinner").arg(shell->doas, urlPath));
         if(isWorld == false)
         {
             cmd.append(" --oneshot");
@@ -2250,7 +2448,8 @@ void BrowserView::contextMenuInstallLink(QMenu* menu, QString urlPath)
     connect(action, &QAction::triggered, this, [this, urlPath]()
     {
         QString cmd;
-        cmd.append("sudo emerge =" + urlPath + " --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner\n");
+        portage->autoKeyword(urlPath);
+        cmd.append(QString("%1 /usr/bin/emerge =%2 --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner\n").arg(shell->doas, urlPath));
         composite->window->exec(cmd, QString("%1 fetch").arg(urlPath));
     });
     menu->addAction(action);
@@ -2259,8 +2458,8 @@ void BrowserView::contextMenuInstallLink(QMenu* menu, QString urlPath)
     connect(action, &QAction::triggered, this, [this, urlPath]()
     {
         QString cmd;
-        cmd = QString("sudo sh -c \"echo '=%1 **' >> /etc/portage/package.accept_keywords/appswipe.tmp\"\n").arg(urlPath);
-        cmd.append("sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner\n");
+        portage->autoKeyword(urlPath);
+        cmd.append(QString("%1 /usr/bin/emerge =%2 --usepkg=n --getbinpkg=n --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner\n").arg(shell->doas, urlPath));
         composite->window->exec(cmd, QString("%1 fetch source").arg(urlPath));
     });
     menu->addAction(action);
@@ -2295,12 +2494,18 @@ void BrowserView::contextMenuAppLink(QMenu* menu, QString urlPath)
     });
     menu->addAction(action);
 
+    QString op;
+    if(appVersion(urlPath).isEmpty() == false)
+    {
+        op = "=";
+    }
+
     action = new QAction("Install", this);
-    connect(action, &QAction::triggered, this, [this, urlPath]()
+    connect(action, &QAction::triggered, this, [this, op, urlPath]()
     {
         QString cmd;
-        cmd = QString("qlop -Hp =%1\n").arg(urlPath);
-        cmd.append("sudo emerge =" + urlPath + " --verbose --verbose-conflicts --nospinner");
+        cmd = QString("qlop -Hp %1%2\n").arg(op, urlPath);
+        cmd.append(QString("%1 /usr/bin/emerge %2%3 --verbose --verbose-conflicts --nospinner").arg(shell->doas, op, urlPath));
         if(isWorld == false)
         {
             cmd.append(" --oneshot");
@@ -2312,17 +2517,17 @@ void BrowserView::contextMenuAppLink(QMenu* menu, QString urlPath)
         }
 
         QString appPathName = appNoVersion(urlPath);
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -emerged %2 -pid %3").arg(shell->appSwipeBackend, appPathName).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged %2").arg(shell->backend, appPathName).arg(qApp->applicationPid()));
         composite->window->exec(cmd, QString("%1 install").arg(urlPath));
     });
     menu->addAction(action);
 
     action = new QAction("Install from source", this);
-    connect(action, &QAction::triggered, this, [this, urlPath]()
+    connect(action, &QAction::triggered, this, [this, op, urlPath]()
     {
         QString cmd;
-        cmd = QString("qlop -Hp =%1\n").arg(urlPath);
-        cmd.append("sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge =" + urlPath + " --usepkg=n --verbose --verbose-conflicts --nospinner");
+        cmd = QString("qlop -Hp %1%2\n").arg(op, urlPath);
+        cmd.append(QString("%1 /usr/bin/emerge %2%3 --usepkg=n --getbinpkg=n --verbose --verbose-conflicts --nospinner").arg(shell->doas, op, urlPath));
         if(isWorld == false)
         {
             cmd.append(" --oneshot");
@@ -2334,27 +2539,27 @@ void BrowserView::contextMenuAppLink(QMenu* menu, QString urlPath)
         }
 
         QString appPathName = appNoVersion(urlPath);
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -emerged %2 -pid %3").arg(shell->appSwipeBackend, appPathName).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged %2").arg(shell->backend, appPathName).arg(qApp->applicationPid()));
         composite->window->exec(cmd, QString("%1 install from source").arg(urlPath));
     });
     menu->addAction(action);
 
     action = new QAction("Fetch", this);
-    connect(action, &QAction::triggered, this, [this, urlPath]()
+    connect(action, &QAction::triggered, this, [this, op, urlPath]()
     {
         QString cmd;
-        cmd = QString("sudo sh -c \"echo '=%1 **' >> /etc/portage/package.accept_keywords/appswipe.tmp\"\n").arg(urlPath);
-        cmd.append("sudo emerge " + urlPath + " --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner\n");
+        portage->autoKeyword(urlPath, op);
+        cmd.append(QString("%1 /usr/bin/emerge %2%3 --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner\n").arg(shell->doas, op, urlPath));
         composite->window->exec(cmd, QString("%1 fetch").arg(urlPath));
     });
     menu->addAction(action);
 
     action = new QAction("Fetch source", this);
-    connect(action, &QAction::triggered, this, [this, urlPath]()
+    connect(action, &QAction::triggered, this, [this, op, urlPath]()
     {
         QString cmd;
-        cmd = QString("sudo sh -c \"echo '=%1 **' >>  /etc/portage/package.accept_keywords/appswipe.tmp\"\n").arg(urlPath);
-        cmd.append("sudo FEATURES=\"${FEATURES} -getbinpkg\" emerge " + urlPath + " --usepkg=n --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner\n");
+        portage->autoKeyword(urlPath, op);
+        cmd.append(QString("%1 /usr/bin/emerge %2%3 --usepkg=n --getbinpkg=n --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner\n").arg(shell->doas, op, urlPath));
         composite->window->exec(cmd, QString("%1 fetch source").arg(urlPath));
     });
     menu->addAction(action);
@@ -2385,8 +2590,8 @@ void BrowserView::contextMenuAppWhitespace(QMenu* menu)
         action = new QAction("Add to @world set", this);
         connect(action, &QAction::triggered, this, [this, urlPath]()
         {
-            QString cmd = "sudo emerge --noreplace " + urlPath + " --verbose --verbose-conflicts --nospinner --ask=n";
-            cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %2").arg(shell->appSwipeBackend).arg(qApp->applicationPid()));
+            QString cmd = QString("%1 /usr/bin/emerge --noreplace %2 --verbose --verbose-conflicts --nospinner --ask=n").arg(shell->doas, urlPath);
+            cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %2").arg(shell->backend).arg(qApp->applicationPid()));
             shell->externalTerm(cmd, QString("%1 add to @world").arg(urlPath), false);
             isWorld = true;
         });
@@ -2397,8 +2602,8 @@ void BrowserView::contextMenuAppWhitespace(QMenu* menu)
         action = new QAction("Remove from @world set", this);
         connect(action, &QAction::triggered, this, [this, urlPath]()
         {
-            QString cmd = "sudo emerge --deselect " + urlPath + " --verbose --verbose-conflicts --nospinner --ask=n";
-            cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %2").arg(shell->appSwipeBackend).arg(qApp->applicationPid()));
+            QString cmd = QString("%1 /usr/bin/emerge --deselect %2 --verbose --verbose-conflicts --nospinner --ask=n").arg(shell->doas, urlPath);
+            cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %2").arg(shell->backend).arg(qApp->applicationPid()));
             shell->externalTerm(cmd, QString("%1 remove from @world").arg(urlPath), false);
             isWorld = false;
         });
@@ -2493,7 +2698,7 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
                 connect(action, &QAction::triggered, this, [this, urlPath]()
                 {
                     QString cmd;
-                    cmd.append("sudo FEATURES=\"${FEATURES} -getbinpkg\" ebuild " + urlPath + " fetch\n");
+                    cmd.append(QString("%1 /usr/bin/ebuild %2 fetch\n").arg(shell->doas, urlPath));
                     composite->window->exec(cmd, QString("%1 fetch source (ignoring dependencies)").arg(urlPath));
                 });
                 menu->addAction(action);
@@ -2666,7 +2871,7 @@ void BrowserView::fetch(QSqlQuery* query)
         return;
     }
 
-    QString cmd = "sudo emerge --autounmask --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner ";
+    QString cmd = QString("%1 /usr/bin/emerge --autounmask --fetch-all-uri --newuse --deep --with-bdeps=y --nospinner ").arg(shell->doas);
     if(composite->window->ask)
     {
         cmd.append("--ask ");
@@ -2777,7 +2982,7 @@ void BrowserView::upgrade(QSqlQuery* query)
         cmd.append(QString("qlop -Hp =%1\n").arg(app));
     }
 
-    cmd.append("sudo emerge --newuse --verbose --verbose-conflicts --nospinner --oneshot ");
+    cmd.append(QString("%1 /usr/bin/emerge --newuse --verbose --verbose-conflicts --nospinner --oneshot ").arg(shell->doas));
     if(composite->window->ask)
     {
         cmd.append("--ask ");
@@ -2785,7 +2990,7 @@ void BrowserView::upgrade(QSqlQuery* query)
 
     cmd.append(packagesPayload.join(' '));
 
-    cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged \"%2\"").arg(shell->appSwipeBackend, reloadPayload.join(' ')).arg(qApp->applicationPid()));
+    cmd.append(QString("\nexport RET_CODE=$?\n%1 -pid %3 -emerged %2").arg(shell->backend, reloadPayload.join(' ')).arg(qApp->applicationPid()));
     composite->window->exec(cmd, QString("Upgrading %1 Packages").arg(appCount));
 }
 

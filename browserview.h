@@ -136,6 +136,11 @@ protected:
     void showQueryResult(QSqlQuery* query, QString header, QString search, bool feelingLucky = false);
     void printApp(QString& result, QString& app, QString& description, QString& latestVersion, QStringList& installedVersions, QStringList& obsoletedVersions);
     QString findAppIcon(bool& hasIcon, QString category, QString package, QString version);
+    QString printDependencies(QStringList dependencies, QSqlQuery& query, bool flagMissing = false);
+    int depMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex);
+    int outerDepMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex = 0);
+    void skipNode(QStringList& nodes, int& index);
+    void removeDuplicateDeps(QStringList& target, QStringList& source);
 
     QProcess* process;
 };
