@@ -61,19 +61,28 @@ public:
     QRegularExpression var_ref;
 
     QRegularExpression dependBasicRE;
+    QRegularExpression dependKeywordsBasicRE;
     QRegularExpression dependVersionRE;
+    QRegularExpression dependKeywordsVersionRE;
     QRegularExpression dependSlotRE;
+    QRegularExpression dependKeywordsSlotRE;
     QRegularExpression dependRepositoryRE;
+    QRegularExpression dependKeywordsRepositoryRE;
 
     QRegularExpression dependLinkRE;
     QRegularExpression dependLinkSlotRE;
     QRegularExpression dependLinkAppRE;
 
-    QString linkDependency(QString input);
+    QString linkDependency(QString input, QString& category, QString& package);
 
     void applyMasks(QSqlDatabase& db, QString atomFilter = "");
     void readMaskFile(QSqlQuery& query, QString fileName, QString atomFilter = "");
     void emergedApp(QString app);
+
+    void autoKeyword(QString app, QString op = "");
+    bool foundKeyworded(QString fileName, QString category, QString package, QString version, QString repo, QString slot, QString subslot, QString keywords);
+    bool globMatch(QString glob, QString s);
+    bool keywordMatch(QString acceptKeywords, QString appKeywords);
 
     enum PackageStatus
     {
