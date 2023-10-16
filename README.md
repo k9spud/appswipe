@@ -18,6 +18,13 @@ App Swipe now does lookups on each dependency for an uninstalled package to
 determine what other packages you need to install. These unsatisfied 
 dependencies show up highlighted in red. 
 
+![Unmet Dependency Highlighting](https://github.com/k9spud/appswipe/assets/39664841/765e80c3-f2b7-4f15-b461-315bab07dea3)
+
+Added support for using `doas` instead of only supporting `sudo`. Removed
+`sudo` from the PDEPENDS list. If neither is installed, App Swipe will
+fall back to simply `echo` the commands it can't execute with elevated 
+privileges.
+
 Previously, the code for updating the internal SQLite database after 
 installing/upgrading a package did not update the total installed disk
 space used by the package. Now we update the database with the size of the
@@ -151,7 +158,7 @@ on this page lets you emerge all the upgradable packages that App Swipe
 shows here. This is similar to `Update World`, except App Swipe doesn't burn 
 a bunch of CPU cycles determining which package dependencies descend from 
 your @world list like emerge does. Instead, it lists any package 
-already installed on your system that could be upgraded to a newer version.
+already installed on your system that might be upgradable to a newer version.
 
 The `View Updates` URL input box supports filters. Let's say you only want 
 the subset of upgradable packages that contain the word `qt` for example. 
@@ -159,10 +166,10 @@ The URL `update:qt` will let you see only those packages, and the `Fetch`
 or `Upgrade` links on this filtered page will be limited to only fetching 
 or upgrading the `qt` subset as well. 
 
-Negative filters are supported. Let's say you want to upgrade Qt packages, 
-but you want to avoid `qtwebengine` for now (because that one is *huge* and 
-takes *forever*). You could simply use the URL 
-`update:qt -qtwebengine`
+Negative filters are supported. If you wanted to upgrade Qt packages, 
+but want to avoid `qtwebengine` for now (because that one is *huge* and 
+takes *forever*), you could simply use the URL 
+`update:qt -qtwebengine`:
 
 ![Filtering updates](https://github.com/k9spud/appswipe/assets/39664841/71df9665-d329-4db0-b6e1-d3b8238a0662)
 
