@@ -258,13 +258,13 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Sync Repos", this);
     connect(action, &QAction::triggered, this, [this]()
     {
-        // QString cmd = "sudo emaint --auto sync";
-        QString cmd = "sudo emerge --sync --nospinner";
+        // QString cmd = QString("%1 /usr/sbin/emaint --auto sync").arg(shell->doas);
+        QString cmd = QString("%1 /usr/bin/emerge --sync --nospinner").arg(shell->doas);
         if(ask)
         {
             cmd.append(" --ask");
         }
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(shell->appSwipeBackend).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(shell->backend).arg(qApp->applicationPid()));
 
         exec(cmd, "Sync Repos");
     });
@@ -279,7 +279,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Fetch Used World", this);
     connect(action, &QAction::triggered, this, [this]()
     {
-        QString cmd = "sudo emerge --update @world --fetchonly --newuse --deep --with-bdeps=y --changed-use --nospinner ";
+        QString cmd = QString("%1 /usr/bin/emerge --update @world --fetchonly --newuse --deep --with-bdeps=y --changed-use --nospinner ").arg(shell->doas);
         exec(cmd, "Fetch Used World");
     });
     menu->addAction(action);
@@ -287,7 +287,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Fetch All World", this);
     connect(action, &QAction::triggered, this, [this]()
     {
-        QString cmd = "sudo emerge --update @world --fetch-all-uri --newuse --deep --with-bdeps=y --changed-use --nospinner";
+        QString cmd = QString("%1 /usr/bin/emerge --update @world --fetch-all-uri --newuse --deep --with-bdeps=y --changed-use --nospinner").arg(shell->doas);
         exec(cmd, "Fetch All World");
     });
     menu->addAction(action);
@@ -301,12 +301,12 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Update System", this);
     connect(action, &QAction::triggered, this, [this]()
     {
-        QString cmd = "sudo emerge --update @system --newuse --deep --with-bdeps=y --verbose --verbose-conflicts --nospinner";
+        QString cmd = QString("%1 /usr/bin/emerge --update @system --newuse --deep --with-bdeps=y --verbose --verbose-conflicts --nospinner").arg(shell->doas);
         if(ask)
         {
             cmd.append(" --ask");
         }
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(shell->appSwipeBackend).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(shell->backend).arg(qApp->applicationPid()));
 
         exec(cmd, "Update System");
     });
@@ -315,12 +315,12 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Update World", this);
     connect(action, &QAction::triggered, this, [this]()
     {
-        QString cmd = "sudo emerge --update @world --newuse --deep --with-bdeps=y --changed-use --verbose --verbose-conflicts --nospinner";
+        QString cmd = QString("%1 /usr/bin/emerge --update @world --newuse --deep --with-bdeps=y --changed-use --verbose --verbose-conflicts --nospinner").arg(shell->doas);
         if(ask)
         {
             cmd.append(" --ask");
         }
-        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(shell->appSwipeBackend).arg(qApp->applicationPid()));
+        cmd.append(QString("\nexport RET_CODE=$?\n%1 -synced -pid %2").arg(shell->backend).arg(qApp->applicationPid()));
         exec(cmd, "Update World");
     });
     menu->addAction(action);
@@ -330,7 +330,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Dispatch Config Changes", this);
     connect(action, &QAction::triggered, this, []()
     {
-        QString cmd = "sudo dispatch-conf";
+        QString cmd = QString("%1 /usr/sbin/dispatch-conf").arg(shell->doas);
         shell->externalTerm(cmd, "Dispatch Config Changes");
     });
     menu->addAction(action);
@@ -338,7 +338,7 @@ BrowserWindow::BrowserWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::
     action = new QAction("Clean Unused Dependencies", this);
     connect(action, &QAction::triggered, this, [this]()
     {
-        QString cmd = "sudo emerge --depclean --deep --with-bdeps=y --verbose --verbose-conflicts --nospinner";
+        QString cmd = QString("%1 /usr/bin/emerge --depclean --deep --with-bdeps=y --verbose --verbose-conflicts --nospinner").arg(shell->doas);
         if(ask)
         {
             cmd.append(" --ask");
@@ -724,7 +724,7 @@ void BrowserWindow::install(QString atom, bool isWorld)
     ui->lineEdit->clear();
     installView->browser()->clear();
     installView->setIcon(":/img/clipboard.svg");
-    QString cmd = "sudo emerge";
+    QString cmd = QString("%1 /usr/bin/emerge").arg(shell->doas);
     foreach(atom, installList)
     {
         cmd.append(QString(" =%1").arg(atom));
@@ -768,7 +768,7 @@ void BrowserWindow::uninstall(QString atom)
     ui->lineEdit->clear();
     uninstallView->browser()->clear();
     uninstallView->setIcon(":/img/clipboard.svg");
-    QString cmd = "sudo emerge --unmerge";
+    QString cmd = QString("%1 /usr/bin/emerge --unmerge").arg(shell->doas);
     foreach(atom, uninstallList)
     {
         cmd.append(QString(" =%1").arg(atom));
@@ -792,10 +792,10 @@ BrowserWindow* BrowserWindow::openWindow()
 
 void BrowserWindow::reloadDatabase()
 {
-    if(shell->appSwipeBackend.isEmpty())
+    if(shell->backend.isEmpty())
     {
-        shell->findAppSwipeBackend();
-        if(shell->appSwipeBackend.isEmpty())
+        shell->findBackend();
+        if(shell->backend.isEmpty())
         {
             QMessageBox::critical(this, tr("Error"), tr("Could not find '/usr/bin/appswipebackend' binary."));
             return;
@@ -814,7 +814,7 @@ void BrowserWindow::reloadDatabase()
     QStringList options;
     options << "-progress" << "-synced" << "-pid" << QString::number(qApp->applicationPid());
 
-    view->browser()->viewProcess(shell->appSwipeBackend, options);
+    view->browser()->viewProcess(shell->backend, options);
 }
 
 void BrowserWindow::reloadDatabaseComplete()
