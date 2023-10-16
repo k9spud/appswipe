@@ -10,6 +10,30 @@ upgrading apps.
 
 ![Screenshot](https://github.com/k9spud/appswipe/assets/39664841/754e807d-4e57-457e-8d54-554d38e8a070)
 
+What's New in v1.1.57?
+======================
+Dependencies are now displayed for packages that haven't been installed 
+yet, thanks to the information in repo metadata caches. Even better,
+App Swipe now does lookups on each dependency for an uninstalled package to
+determine what other packages you need to install. These unsatisfied 
+dependencies show up highlighted in red. 
+
+Previously, the code for updating the internal SQLite database after 
+installing/upgrading a package did not update the total installed disk
+space used by the package. Now we update the database with the size of the
+installed package.
+
+Auto-keyword unmasking has been refactored. We no longer sudo a shell script
+to append to /etc/portage/package.accept_keyword/appswipe.tmp. Instead, we 
+require the user to set up such a file and give it write permissions for 
+so that sudo/doas is not required. App Swipe now does some checking to try 
+to avoid adding accept_keyword entries for packages that have already been 
+keyword unmasked so that this file doesn't get bloated as quickly.
+
+Right click "List files owned" has been removed. Instead, a link on the app 
+view page for the installed size can be used. This reduces the number 
+of clicks needed to get to the installed files list.
+
 Help Get the Word Out
 =====================
 
@@ -61,6 +85,107 @@ emerge app-portage/appswipe
 If all went well, you can now run the `appswipe` program from your normal 
 user-level account.
 
+Root Privileges
+================
+Do not run App Swipe as 'root.' For searching and browsing your local 
+repository files, App Swipe never uses any elevated privileges. Only
+when you attempt to make system wide changes (install/upgrade/uninstall/etc)
+are elevated permissions necessary.
+
+In order to execute `emerge` and other tools with elevated permissions, 
+App Swipe will either use the `doas` or `sudo` command (whichever is 
+installed on your system). If you've already got one of these configured to
+let you run commands as root, you probably don't need to do any additional 
+configuration. However, if you want a more fine grained configuration, the 
+following may be useful:
+
+Example `doas` configuration
+----------------------------
+When using [doas](https://wiki.gentoo.org/wiki/Doas), you could add the 
+following to `/etc/doas.conf` (substitute the username you run App Swipe 
+under for USER):
+
+```console
+permit USER cmd /usr/bin/emerge
+permit USER cmd /usr/bin/ebuild
+permit USER cmd /usr/sbin/dispatch-conf
+```
+
+Example `sudo` configuration
+----------------------------
+When using [sudo](https://wiki.gentoo.org/wiki/Sudo), you could add the 
+following using the `visudo` command (substitute the username you 
+run App Swipe under for USER):
+
+```console
+USER localhost = /usr/bin/emerge
+USER localhost = /usr/bin/ebuild
+USER localhost = /usr/sbin/dispatch-conf ""
+```
+
+Using App Swipe
+===============
+
+The first thing App Swipe does is scrape up all the scattered data about
+installed packages from `/var/db/pkg` and packages available in repos 
+at `/var/db/repos`. This data is inserted into a 
+[SQLite](https://www.sqlite.org/) database that is stored at
+`$HOME/.AppSwipe/AppSwipe.db`. 
+
+From that point on, you can do searches and browse your portage repos
+at blazing speed, thanks to the underlying SQLite database. As you install, 
+upgrade, etc, App Swipe attempts to keep the SQLite database up-to-date, 
+but this is currently not always perfect. If an emerge operation pulls in 
+additional dependencies, for example, App Swipe currently has no way of 
+knowing about these extra changes, so you may have to manually trigger 
+a `Reload Database` operation from time to time, to bring App Swipe's 
+internal database back up to matching what's really in your system at 
+the moment.
+
+Using the `View Updates` page
+-----------------------------
+
+The `View Updates` page features a list of all potentionally upgradable
+packages that are currently installed on your system. The `Upgrade` link 
+on this page lets you emerge all the upgradable packages that App Swipe 
+shows here. This is similar to `Update World`, except App Swipe doesn't burn 
+a bunch of CPU cycles determining which package dependencies descend from 
+your @world list like emerge does. Instead, it lists any package 
+already installed on your system that could be upgraded to a newer version.
+
+The `View Updates` URL input box supports filters. Let's say you only want 
+the subset of upgradable packages that contain the word `qt` for example. 
+The URL `update:qt` will let you see only those packages, and the `Fetch` 
+or `Upgrade` links on this filtered page will be limited to only fetching 
+or upgrading the `qt` subset as well. 
+
+Negative filters are supported. Let's say you want to upgrade Qt packages, 
+but you want to avoid `qtwebengine` for now (because that one is *huge* and 
+takes *forever*). You could simply use the URL 
+`update:qt -qtwebengine`
+
+![Filtering updates](https://github.com/k9spud/appswipe/assets/39664841/71df9665-d329-4db0-b6e1-d3b8238a0662)
+
+Automatic Keyword Unmasking
+---------------------------
+
+App Swipe can automatically keyword unmask packages when you attempt to 
+fetch or install a "testing" or "unsupported" (non-keyworded) release.
+
+To enable this feature, create an accept_keywords file with 
+writable permissions for your username like this:
+
+```console
+cd /etc/portage/package.accept_keywords
+touch appswipe.tmp
+chown USER:USER appswipe.tmp
+chmod 0644 appswipe.tmp
+```
+This feature may have security implications; it's use is optional. 
+If you don't provide user write permission to the file 
+`/etc/portage/package.accept_keywords/appswipe.tmp`, App Swipe will
+silently skip doing automatic keyword unmasking.
+
 Keyboard Shortcuts
 ==================
 
@@ -111,103 +236,22 @@ way to close a tab.
 
 `ALT-F` Opens the app menu.
 
-What's New in v1.1.52?
-======================
+Common Problems
+===============
 
-Split off database reload code into a separate command line program, 
-`appswipebackend`. Going forward, more and more code should be moved
-into the backend so that only the bare essential code needed to keep the
-GUI displayed is kept in resident memory.
+When I right click and "Reinstall from source," it just reinstalls the 
+previously built binary?
+----------------------------------------------------------------------
 
-Database loading code now supports capturing data from the repo's 
-`metadata/md5-cache/` instead of trying to parse the data out of .ebuild 
-files. This solves a lot of problems with slot numbers that were previously
-showing bad data because the .ebuild files often do a lot of scripting
-with regards to declaring a slot number. App Swipe will still continue to
-fall back to parsing .ebuild files if the repo does not have metadata cache.
+This can be caused by having "FEATURES=${FEATURES} getbinpkg" in your
+`/etc/portage/make.conf` file. App Swipe can't override FEATURES
+from the command line.
 
-Now supports displaying bzip2 compressed files. 
-Now supports displaying text files with markdown formatting.
-
-Now does a better job of sorting packages by version number. Previously, 
-version numbers containing alpha, beta, pre, rc (basically, any sort of 
-"pre-release") could end up sorting out as being newer than the final 
-release.
-
-Fixed a bug in applying masks to the right versions when using the `<=` 
-operator. 
-
-Now supports packages with excessive tuples in the version string
-(such as `net-ftp/ftp-0.17.34.0.2.5.1`). The SQL database schema now supports
-up to 10 tuples maximum.
-
-Available USE flags (IUSE) now shows the latest available set from 
-the latest release in the repo rather than showing what the available USE
-flags were for that package at install. This seems more useful, as it may let
-you know more about what's really available out there. 
-
-Found some packages where the same IUSE flag is listed multiple times - we 
-now remove duplicates so App Swipe's display is less cluttered.
-
-We now filter out USE flags that aren't in the package's available IUSE flags
-list. This cleans up the display of extraneous USE flags that seem more like
-internal portage flags than actual options for the user.
-
-Hard reload (CTRL-R) when viewing an app page no longer blindly reloads all 
-mask files like it used to. Instead, we only execute SQL updates
-for the masks that contain this app's atom string. This makes hard 
-reload work a lot faster while most likely still providing the same results.
-
-Pressing Return while a link is highlighted in the browser view now triggers
-navigating to the linked page. This keyboard shortcut comes in handy after 
-doing a CTRL-F search for a particular package.
-
-What's New in v1.1.48?
-======================
-
-Added support for laptops that have no right mouse button. Now you can left 
-click and hold to trigger a "right click." 
-
-`View Updates` now filters out live ebuilds with version numbers
-9999, 99999, 999999, 9999999, 99999999, or 99999999 (just to be sure).
-
-The `View Updates` screen now features an `Upgrade` button to let you emerge
-all the upgradable packages that App Swipe sees. This is similar to
-`Update World`, except App Swipe doesn't burn a bunch of CPU cycles 
-determining which package dependencies descend from your @world list like
-emerge does. Instead, we just list any package already installed on your 
-system that could be upgraded to a newer version.
-
-The `View Updates` URL input box now supports adding filters.
-Let's say you only want the subset of upgradable packages
-that contain the word `qt` for example. The URL `update:qt` will let you see
-only those packages, and the `Fetch` or `Upgrade` buttons on this page will 
-limit itself to only fetching or upgrading the `qt` subset as well. 
-
-You can also apply negative filters. Let's say you want to upgrade Qt 
-packages, but you want to avoid `qtwebengine` for now (because that one is 
-*huge* and takes *forever*). You could simply use the URL 
-`update:qt -qtwebengine`
-
-![Filtering updates](https://github.com/k9spud/appswipe/assets/39664841/71df9665-d329-4db0-b6e1-d3b8238a0662)
-
-`Update System` and `Update World` now add the `--changed-use` emerge flag. 
-This flag makes emerge pick up on packages that need re-building due to
-any new USE flag changes made to your portage configuration files.
-
-We now trigger an automatic App Swipe database reload at the end of successful 
-`emerge --update` operations.
-
-Fixed a bug where the app could crash when saving state if there exists
-a newly opened window that has no tabs.
-
-Fixed a bug that made it impossible to view an app info page where the app name
-has what might be a version number (but actually isn't). For example 
-`media-fonts/font-bh-100dpi` would previously show a blank page when 
-trying to bring it up.
-
-Added code for removing /tmp/AppSwipe.XXX temporary file after it has been 
-used.
+The suggested workaround is to remove `getbinpkg` from the `FEATURES` 
+variable, and instead add `--getbinpkg=y` to the `EMERGE_DEFAULT_OPTS`
+variable. This has the same effect, except now App Swipe can override 
+the use of binary packages when doing a "Reinstall from source" 
+operation.
 
 License
 =======
