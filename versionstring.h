@@ -26,6 +26,7 @@ public:
     VersionString();
 
     void parse(QString input);
+    bool match(QString filter, QString version2);
 
     QString cut(int index);
     QString cutInternalVx(int index);

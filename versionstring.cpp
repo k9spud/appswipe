@@ -164,6 +164,123 @@ void VersionString::parse(QString input)
     vx.append(revision);
 }
 
+bool VersionString::match(QString filter, QString version2)
+{
+    if(filter == "=")
+    {
+        return version2 == pvr;
+    }
+
+    VersionString vb;
+    vb.parse(version2);
+    QString a;
+    QString b;
+    int i;
+    if(filter == "<=")
+    {
+        for(i = 0; i < vb.vx.count() && i < vx.count(); i++)
+        {
+            a = vx.at(i);
+            b = vb.vx.at(i);
+            if(a > b)
+            {
+                return false;
+            }
+
+            if(a < b)
+            {
+                return true;
+            }
+        }
+
+        // both versions are equal
+        return true;
+    }
+
+    if(filter == ">=")
+    {
+        for(i = 0; i < vb.vx.count() && i < vx.count(); i++)
+        {
+            a = vx.at(i);
+            b = vb.vx.at(i);
+            if(a < b)
+            {
+                return false;
+            }
+
+            if(a > b)
+            {
+                return true;
+            }
+        }
+
+        // both versions are equal
+        return true;
+    }
+
+
+    if(filter == "<")
+    {
+        for(i = 0; i < vb.vx.count() && i < vx.count(); i++)
+        {
+            a = vx.at(i);
+            b = vb.vx.at(i);
+            if(a > b)
+            {
+                return false;
+            }
+
+            if(a < b)
+            {
+                return true;
+            }
+        }
+
+        // both versions are equal
+        return false;
+    }
+
+    if(filter == ">")
+    {
+        for(i = 0; i < vb.vx.count() && i < vx.count(); i++)
+        {
+            a = vx.at(i);
+            b = vb.vx.at(i);
+            if(a < b)
+            {
+                return false;
+            }
+
+            if(a > b)
+            {
+                return true;
+            }
+        }
+
+        // both versions are equal
+        return false;
+    }
+
+    if(filter == "~")
+    {
+        for(i = 0; i < (MAXVX-1) && i < vb.vx.count() && i < vx.count(); i++)
+        {
+            a = vx.at(i);
+            b = vb.vx.at(i);
+            if(a != b)
+            {
+                return false;
+            }
+        }
+
+        // both versions are equal (while ignoring any -rX revision number differences)
+        return true;
+    }
+
+    qDebug() << "Unknown filter op:" << filter << "App Version:" << pvr << "Match Version" << version2;
+    return false;
+}
+
 QString VersionString::cut(int index)
 {
     if(index >= 0 && index < components.count())
