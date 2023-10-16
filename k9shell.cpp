@@ -26,33 +26,46 @@ K9Shell* shell = nullptr;
 
 K9Shell::K9Shell(QObject *parent) : QProcess(parent)
 {
-    findAppSwipeBackend();
+    findBackend();
+
+    doas = "echo"; // fall back to echoing commands if sudo and doas are missing from the system
+
+    QFileInfo fi;
+    fi.setFile("/usr/bin/doas");
+    if(fi.exists())
+    {
+        doas = fi.canonicalFilePath();
+        return;
+    }
+
+    fi.setFile("/usr/bin/sudo");
+    if(fi.exists())
+    {
+        doas = fi.canonicalFilePath();
+    }
 }
 
-void K9Shell::findAppSwipeBackend()
+void K9Shell::findBackend()
 {
     QFileInfo fi;
     fi.setFile(qApp->applicationDirPath() + "/appswipebackend");
     if(fi.exists())
     {
-        appSwipeBackend = fi.canonicalFilePath();
-        qDebug() << appSwipeBackend;
+        backend = fi.canonicalFilePath();
         return;
     }
 
     fi.setFile("/usr/bin/appswipebackend");
     if(fi.exists())
     {
-        appSwipeBackend = fi.canonicalFilePath();
-        qDebug() << appSwipeBackend;
+        backend = fi.canonicalFilePath();
         return;
     }
 
     fi.setFile("/usr/local/bin/appswipebackend");
     if(fi.exists())
     {
-        appSwipeBackend = fi.canonicalFilePath();
-        qDebug() << appSwipeBackend;
+        backend = fi.canonicalFilePath();
         return;
     }
     qDebug() << "Couldn't find appswipebackend binary!";
@@ -65,7 +78,6 @@ void K9Shell::findBzip2()
     if(fi.exists())
     {
         bzip2 = fi.canonicalFilePath();
-        qDebug() << bzip2;
         return;
     }
 
@@ -73,7 +85,6 @@ void K9Shell::findBzip2()
     if(fi.exists())
     {
         bzip2 = fi.canonicalFilePath();
-        qDebug() << bzip2;
         return;
     }
     qDebug() << "Couldn't find bzip2 binary!";
@@ -117,7 +128,7 @@ void K9Shell::externalTerm(QString script, QString title, bool waitSuccessful)
 
         if(cmd.contains("RET_CODE=$?") == false &&
            cmd.contains("qlop -Hp") == false &&
-           cmd.contains(appSwipeBackend) == false)
+           cmd.contains(backend) == false)
         {
             out << "echo \"" << escaped << "\"\n";
         }

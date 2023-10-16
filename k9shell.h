@@ -28,10 +28,10 @@ class K9Shell : public QProcess
 public:
     explicit K9Shell(QObject *parent = nullptr);
 
-    void findAppSwipeBackend();
-    QString appSwipeBackend;
-
+    void findBackend();
     void findBzip2();
+    QString backend;
+    QString doas;
     QString bzip2;
 
 public slots:
