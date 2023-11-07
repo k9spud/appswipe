@@ -10,36 +10,28 @@ upgrading apps.
 
 ![Screenshot](https://github.com/k9spud/appswipe/assets/39664841/754e807d-4e57-457e-8d54-554d38e8a070)
 
-What's New in v1.1.57?
+What's New in v1.1.59?
 ======================
-Dependencies are now displayed for packages that haven't been installed 
-yet, thanks to the information in repo metadata caches. Even better,
-App Swipe now does lookups on each dependency for an uninstalled package to
-determine what other packages you need to install. These unsatisfied 
-dependencies show up highlighted in red. 
+Added right click "Copy flag to clipboard" context menu for USE flags.
 
-![Unmet Dependency Highlighting](https://github.com/k9spud/appswipe/assets/39664841/765e80c3-f2b7-4f15-b461-315bab07dea3)
+Viewing an app that is already installed now highlights dependencies that
+aren't installed in red (which normally shouldn't happen) and dependencies
+that may be upgradable in yellow. Note that this does not do any checking
+whether the newer versions satisfy all dependency constraints however.
 
-Added support for using `doas` instead of only supporting `sudo`. Removed
-`sudo` from the PDEPENDS list. If neither is installed, App Swipe will
-fall back to simply `echo` the commands it can't execute with elevated 
-privileges.
+Improved left click and hold to work a little easier. Previously, if you 
+moved the mouse cursor a little too much (easy to do on a touch pad), it 
+would fail to open the context menu.
 
-Previously, the code for updating the internal SQLite database after 
-installing/upgrading a package did not update the total installed disk
-space used by the package. Now we update the database with the size of the
-installed package.
+Pressing enter in the URL input box repeatedly now does a soft reload
+instead of navigating to the same URL over again. This prevents the 
+Back history from getting filled up with the same URL multiple times.
 
-Auto-keyword unmasking has been refactored. We no longer sudo a shell script
-to append to /etc/portage/package.accept_keyword/appswipe.tmp. Instead, we 
-require the user to set up such a file and give it write permissions for 
-so that sudo/doas is not required. App Swipe now does some checking to try 
-to avoid adding accept_keyword entries for packages that have already been 
-keyword unmasked so that this file doesn't get bloated as quickly.
+App icons that are too big (>33% of the view) are now forced to 33% of the 
+view width (solves `app:app-editors/vscodium` looking like crap).
 
-Right click "List files owned" has been removed. Instead, a link on the app 
-view page for the installed size can be used. This reduces the number 
-of clicks needed to get to the installed files list.
+Fixed a dependency parsing bug where a slot number containing a "-"
+could confuse the regular expression used to sort it out.
 
 Help Get the Word Out
 =====================
@@ -218,15 +210,15 @@ way to close a tab.
 
 `CTRL-0` Displays the very last tab.
 
-`CTRL-backtick` Displays the `update:` upgradable package list tab. Opens one if none previously opened.
+`CTRL-backtick` Displays the `update:` upgradable packages list in a new tab (if not previously opened).
 
-`CTRL-L` Jumps to the URL input text box.
+`CTRL-L` Sets keyboard input focus on the URL input text box.
 
 `SHIFT-Return` Navigates to the first result of an application search.
 
 `F5` Refreshes the browser view (soft reload)
 
-`CTRL-R` Reloads the SQLite database for this app and refreshes view (hard reload).
+`CTRL-R` Reloads the SQLite database for the currently viewed app and refreshes view (hard reload).
 
 `ALT-Back Arrow Key` Displays the previous page in browser history.
 
@@ -234,13 +226,27 @@ way to close a tab.
 
 `CTRL-F` Searches browser view text.
 
-`F3` Repeats last search, moving forward.
+`F3` Repeats last search, moving forward through the text.
 
-`SHIFT-F3` Repeats last search, going backwards.
+`SHIFT-F3` Repeats last search, going backwards through the text.
 
-`Escape` Reserved for stopping long running browser view operations (probably inoperable at the moment, since we don't have any such slow operations, right?)
+`Escape` Cancels reloading page.
 
 `ALT-F` Opens the app menu.
+
+Mouse Shortcuts
+===============
+
+Middle clicking a link opens it in a new tab (without immediately switching
+focus to the new tab).
+
+Middle clicking a tab closes that tab.
+
+Left click and drag in a blank space area of the browser view lets you
+grab the page and swipe up or down to scroll it.
+
+Left click and hold for >600ms opens the pop up context menu. This allows 
+computers without a right mouse button to open the context menus.
 
 Common Problems
 ===============
