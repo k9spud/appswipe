@@ -61,6 +61,7 @@
 #include <QStringList>
 #include <QInputDialog>
 #include <QMessageBox>
+#include <QImageReader>
 
 #define START_SWIPE_THRESHOLD 20
 #define RELOAD_THRESHOLD 250
@@ -169,91 +170,48 @@ bool BrowserView::find(const QString& text, QTextDocument::FindFlags options)
 
 void BrowserView::navigateTo(QString text, bool changeHistory, bool feelingLucky)
 {
-    if(text.isEmpty())
+    if(text.startsWith("fetch:"))
     {
-        viewAbout();
+        viewUpdates("fetch", text.mid(6));
+        return;
     }
-    else
+
+    if(text.startsWith("upgrade:"))
     {
-        if(text.startsWith("clip:"))
+        viewUpdates("upgrade", text.mid(8));
+        return;
+    }
+
+    QPoint pos;
+    if(changeHistory &&
+       !text.startsWith("install:") &&
+       !text.startsWith("uninstall:") &&
+       !text.startsWith("unmask:"))
+    {
+        pos = scrollPosition();
+    }
+
+    if(text.startsWith("file://") && text.endsWith(".bz2"))
+    {
+        if(shell->bzip2.isEmpty())
         {
-           QClipboard* clip = qApp->clipboard();
-           clip->setText(text.mid(5));
-           composite->setStatus(QString("'%1' copied to the clipboard.").arg(text.mid(5)));
-           return;
+            shell->findBzip2();
         }
 
-        if(text.startsWith("fetch:"))
+        if(shell->bzip2.isEmpty())
         {
-            viewUpdates("fetch", text.mid(6));
+            QMessageBox::information(this, tr("Warning"), tr("Could not find '/bin/bzip2' binary."));
             return;
         }
 
-        if(text.startsWith("upgrade:"))
-        {
-            viewUpdates("upgrade", text.mid(8));
-            return;
-        }
+        clear();
+        markdown.clear();
 
-        QPoint pos;
-        if(changeHistory &&
-           !text.startsWith("install:") &&
-           !text.startsWith("uninstall:") &&
-           !text.startsWith("unmask:"))
-        {
-            pos = scrollPosition();
-        }
+        QStringList options;
+        options << "-cd" << text.mid(7);
+        viewProcess(shell->bzip2, options);
 
-        if(text.startsWith("file://") && text.endsWith(".bz2"))
-        {
-            if(shell->bzip2.isEmpty())
-            {
-                shell->findBzip2();
-            }
-
-            if(shell->bzip2.isEmpty())
-            {
-                QMessageBox::information(this, tr("Warning"), tr("Could not find '/bin/bzip2' binary."));
-                return;
-            }
-
-            clear();
-            markdown.clear();
-
-            QStringList options;
-            options << "-cd" << text.mid(7);
-            viewProcess(shell->bzip2, options);
-
-            currentUrl = text;
-            if(changeHistory &&
-               !text.startsWith("install:") &&
-               !text.startsWith("uninstall:") &&
-               !text.startsWith("unmask:"))
-            {
-                History::State state;
-                state.target = currentUrl;
-                state.title = documentTitle();
-                state.pos = pos;
-                emit appendHistory(state);
-                emit urlChanged(currentUrl);
-            }
-
-            composite->setStatus("");
-            oldLink.clear();
-
-            return;
-        }
-
-        if(text.contains(':'))
-        {
-            setUrl(text);
-        }
-        else
-        {
-            currentUrl = text;
-            searchApps(text, feelingLucky);
-        }
-
+        currentUrl = text;
         if(changeHistory &&
            !text.startsWith("install:") &&
            !text.startsWith("uninstall:") &&
@@ -269,12 +227,40 @@ void BrowserView::navigateTo(QString text, bool changeHistory, bool feelingLucky
 
         composite->setStatus("");
         oldLink.clear();
-        viewport()->unsetCursor();
 
-        if(text.startsWith("files:") == false) // can't emit loadFinished for files: because that one uses an external process.
-        {
-            emit loadFinished();
-        }
+        return;
+    }
+
+    if(text.contains(':'))
+    {
+        setUrl(text);
+    }
+    else
+    {
+        currentUrl = text;
+        searchApps(text, feelingLucky);
+    }
+
+    if(changeHistory &&
+       !text.startsWith("install:") &&
+       !text.startsWith("uninstall:") &&
+       !text.startsWith("unmask:"))
+    {
+        History::State state;
+        state.target = currentUrl;
+        state.title = documentTitle();
+        state.pos = pos;
+        emit appendHistory(state);
+        emit urlChanged(currentUrl);
+    }
+
+    composite->setStatus("");
+    oldLink.clear();
+    viewport()->unsetCursor();
+
+    if(text.startsWith("files:") == false) // can't emit loadFinished for files: because that one uses an external process.
+    {
+        emit loadFinished();
     }
 }
 
@@ -411,8 +397,9 @@ QString BrowserView::printDependencies(QStringList dependencies, QSqlQuery& quer
     QString s;
     QString category;
     QString package;
-    QStringList atoms;
-    if(flagMissing)
+    QStringList missingAtoms;
+    QStringList upgradableAtoms;
+    if(true || flagMissing)
     {
         for(int i = 0; i < dependencies.count(); i++)
         {
@@ -425,29 +412,29 @@ QString BrowserView::printDependencies(QStringList dependencies, QSqlQuery& quer
                 s = category;
                 s.append('/');
                 s.append(package);
-                if(atoms.contains(s) == false)
+                if(missingAtoms.contains(s) == false)
                 {
-                    atoms.append(s);
+                    missingAtoms.append(s);
                 }
             }
         }
 
         s = R"EOF(
-select c.CATEGORY, p.PACKAGE, p.VERSION from PACKAGE p
-inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID
-where p.INSTALLED != 0 and c.CATEGORY || '/' || p.PACKAGE in (
-)EOF";
+    select c.CATEGORY, p.PACKAGE, p.VERSION from PACKAGE p
+    inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID
+    where p.INSTALLED != 0 and c.CATEGORY || '/' || p.PACKAGE in (
+    )EOF";
 
-        if(atoms.count() > 0)
+        if(missingAtoms.count() > 0)
         {
             QString q = ",?";
 
             s.append('?');
-            s.append(q.repeated(atoms.count() - 1));
+            s.append(q.repeated(missingAtoms.count() - 1));
             s.append(")");
 
             query.prepare(s);
-            foreach(s, atoms)
+            foreach(s, missingAtoms)
             {
                 query.addBindValue(s);
             }
@@ -457,15 +444,58 @@ where p.INSTALLED != 0 and c.CATEGORY || '/' || p.PACKAGE in (
                 do
                 {
                     s = QString("%1/%2").arg(query.value(0).toString(), query.value(1).toString());
-                    atoms.removeAll(s);
+                    missingAtoms.removeAll(s);
                 } while(query.next());
             }
         }
     }
 
+    // ============================================================================================
+    // flag upgradable dependencies
+    // ============================================================================================
+    s =
+        R"EOF(
+            select c.CATEGORY, p.PACKAGE
+            from PACKAGE p
+            inner join CATEGORY c on c.CATEGORYID=p.CATEGORYID
+            inner join PACKAGE p2 on p2.PACKAGE=p.PACKAGE and p2.CATEGORYID=p.CATEGORYID and
+                p2.SLOT is p.SLOT and p2.PACKAGEID != p.PACKAGEID and p2.INSTALLED=0 and p2.MASKED=0 and
+                p2.VERSION != '9999' and p2.VERSION != '99999' and p2.VERSION != '999999' and p2.VERSION != '9999999' and p2.VERSION != '99999999' and p2.VERSION != '999999999' and
+            (
+                (p2.V1 > p.V1) or
+                (p2.V1 is p.V1 and p2.V2 > p.V2) or
+                (p2.V1 is p.V1 and p2.V2 is p.V2 and p2.V3 > p.V3) or
+                (p2.V1 is p.V1 and p2.V2 is p.V2 and p2.V3 is p.V3 and p2.V4 > p.V4) or
+                (p2.V1 is p.V1 and p2.V2 is p.V2 and p2.V3 is p.V3 and p2.V4 is p.V4 and p2.V5 > p.V5) or
+                (p2.V1 is p.V1 and p2.V2 is p.V2 and p2.V3 is p.V3 and p2.V4 is p.V4 and p2.V5 is p.V5 and p2.V6 > p.V6) or
+                (p2.V1 is p.V1 and p2.V2 is p.V2 and p2.V3 is p.V3 and p2.V4 is p.V4 and p2.V5 is p.V5 and p2.V6 is p.V6 and p2.V7 > p.V7) or
+                (p2.V1 is p.V1 and p2.V2 is p.V2 and p2.V3 is p.V3 and p2.V4 is p.V4 and p2.V5 is p.V5 and p2.V6 is p.V6 and p2.V7 is p.V7 and p2.V8 > p.V8) or
+                (p2.V1 is p.V1 and p2.V2 is p.V2 and p2.V3 is p.V3 and p2.V4 is p.V4 and p2.V5 is p.V5 and p2.V6 is p.V6 and p2.V7 is p.V7 and p2.V8 is p.V8 and p2.V9 > p.V9) or
+                (p2.V1 is p.V1 and p2.V2 is p.V2 and p2.V3 is p.V3 and p2.V4 is p.V4 and p2.V5 is p.V5 and p2.V6 is p.V6 and p2.V7 is p.V7 and p2.V8 is p.V8 and p2.V9 is p.V9 and p2.V10 > p.V10)
+            )
+            where p.INSTALLED != 0 and
+            (
+                (p.STATUS is null or p.STATUS=0) or
+                (p.STATUS=1 and p2.STATUS>=1) or
+                (p.STATUS=2 and p2.STATUS=2)
+            )
+            limit 10000
+            )EOF";
+
+    query.prepare(s);
+    if(query.exec() && query.first())
+    {
+        do
+        {
+            s = QString("%1/%2").arg(query.value(0).toString(), query.value(1).toString());
+            upgradableAtoms.append(s);
+        } while(query.next());
+    }
+
     QString html;
     bool newline = false;
     int parens = 0;
+    QString atom;
     for(int i = 0; i < dependencies.count(); i++)
     {
         s = dependencies.at(i);
@@ -497,9 +527,14 @@ where p.INSTALLED != 0 and c.CATEGORY || '/' || p.PACKAGE in (
             }
         }
 
-        if(flagMissing && atoms.contains(QString("%1/%2").arg(category, package)))
+        atom = QString("%1/%2").arg(category, package);
+        if(missingAtoms.contains(atom))
         {
             html.append(s.replace("<LINKCOLOR>", "STYLE=\"color: #fb9f9f\""));
+        }
+        else if(upgradableAtoms.contains(atom))
+        {
+            html.append(s.replace("<LINKCOLOR>", "STYLE=\"color: #fbff9d\""));
         }
         else
         {
@@ -783,12 +818,40 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
         }
         else
         {
-            html.append(QString(R"EOF(
-<TABLE>
-<TR><TD><IMG SRC="%4"></TD>
-<TD><P><BR><B>&nbsp;<A HREF="clip:%5/%1">%5/%1</A></B></P><P>&nbsp;%2</P><P>&nbsp;%3</P></TD></TR>
-</TABLE>
-)EOF").arg(package, description, homePage, appicon, category));
+            int w = 0, h = 0;
+            if(appicon.contains("128x128") == false)
+            {
+                QImage image;
+                QImageReader reader;
+                reader.setDecideFormatFromContent(true);
+                reader.setFileName(appicon);
+                if(reader.read(&image) == false || image.isNull())
+                {
+                    qDebug() << appicon << reader.errorString();
+                }
+                else
+                {
+                    w = image.width();
+                    h = image.height();
+                    if(w > static_cast<float>(composite->width()) * 0.33)
+                    {
+                        h = static_cast<float>(h) * ((static_cast<float>(composite->width() * 0.33)) / static_cast<float>(w));
+                        w = static_cast<float>(composite->width()) * 0.33;
+                        qDebug() << "image width:" << image.width() << "height:" << image.height() << "new width:" << w << "height:" << h;
+                    }
+                }
+            }
+
+            html.append("<TABLE><TR><TD>");
+            if(h != 0 && w != 0)
+            {
+                html.append(QString("<IMG SRC=\"%1\" WIDTH=%2 HEIGHT=%3>").arg(appicon).arg(w).arg(h));
+            }
+            else
+            {
+                html.append(QString("<IMG SRC=\"%1\">").arg(appicon));
+            }
+            html.append(QString("</TD><TD><P><BR><B>&nbsp;<A HREF=\"clip:%1/%2\">%1/%2</A></B></P><P>&nbsp;%3</P><P>&nbsp;%4</P></TD></TR></TABLE>").arg(category, package, description, homePage));
         }
 
         html.append("<P><TABLE BORDER=0 CLASS=\"normal\">");
@@ -1928,7 +1991,7 @@ void BrowserView::mousePressEvent(QMouseEvent* event)
     {
         animationTimer.stop(); // immediately stop swipe scrolling if user presses screen
 
-        startPress = event->pos();
+        startPress = startLongPress = event->pos();
         longPressTimer.start(LONGPRESS_MSECS_THRESHOLD);
 
         QPointF p = event->pos();
@@ -1953,7 +2016,7 @@ void BrowserView::longPressTimeout()
 {
     longPressTimer.stop();
     QContextMenuEvent::Reason reason = QContextMenuEvent::Mouse;
-    QContextMenuEvent e(reason, startPress);
+    QContextMenuEvent e(reason, startLongPress);
     contextMenuEvent(&e);
     eatPress = true;
     scrollGrabbed = false;
@@ -1966,6 +2029,24 @@ void BrowserView::copyAvailableEvent(bool yes)
 
 void BrowserView::mouseMoveEvent(QMouseEvent* event)
 {
+    QPointF p = event->pos();
+
+    QPointF delta = p - startLongPress;
+    if(delta.x() > 4 || delta.x() < -4 || delta.y() > 4 || delta.y() < -4)
+    {
+        if(selecting)
+        {
+            // disable long press click timer if mouse is being moved around to select text.
+            longPressTimer.stop();
+        }
+        else if(longPressTimer.isActive())
+        {
+            // reset long press click timer if mouse is being moved around.
+            longPressTimer.start(LONGPRESS_MSECS_THRESHOLD);
+            startLongPress = event->pos();
+        }
+    }
+
     if(scrollGrabbed)
     {
         dy = event->globalY() - oldY;
@@ -1976,11 +2057,12 @@ void BrowserView::mouseMoveEvent(QMouseEvent* event)
                 return;
             }
 
-            longPressTimer.stop();
             eatPress = false;
             swiping = true;
             viewport()->setCursor(Qt::ClosedHandCursor);
         }
+
+        longPressTimer.stop();
 
         int newScrollValue = oldScrollValue - dy;
         verticalScrollBar()->setValue(newScrollValue);
@@ -1999,15 +2081,6 @@ void BrowserView::mouseMoveEvent(QMouseEvent* event)
             oldY = event->globalY();
         }
         return;
-    }
-
-    QPointF p = event->pos();
-
-    // don't allow long press click if mouse is being moved around.
-    QPointF delta = p - startPress;
-    if(delta.x() > 3 || delta.x() < -3 || delta.y() > 3 || delta.y() < -3)
-    {
-        longPressTimer.stop();
     }
 
     p.setX(p.x() + horizontalScrollBar()->value());
@@ -2646,6 +2719,16 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
             connect(action, &QAction::triggered, this, [this]()
             {
                 shell->externalBrowser(context);
+            });
+            menu->addAction(action);
+        }
+        else if(context.startsWith("use:"))
+        {
+            action = new QAction("Copy flag to clipboard", this);
+            connect(action, &QAction::triggered, this, [urlPath]()
+            {
+                QClipboard* clip = qApp->clipboard();
+                clip->setText(urlPath);
             });
             menu->addAction(action);
         }
@@ -3469,68 +3552,70 @@ QString BrowserView::findAppIcon(bool& hasIcon, QString category, QString packag
     QString s;
     QString appicon = QString("/var/db/pkg/%1/%2-%3/CONTENTS").arg(category, package, version);
     input.setFileName(appicon);
-    if(input.open(QIODevice::ReadOnly))
+    if(!input.open(QIODevice::ReadOnly))
     {
-        s = input.readAll();
-        input.close();
-        QStringList lines = s.split('\n');
-        foreach(s, lines)
-        {
-            s.remove('\n');
-            s = s.trimmed();
-            if(s.isEmpty() || s.startsWith('#'))
-            {
-                continue;
-            }
+        return "";
+    }
 
-            if(s.contains(".desktop "))
+    s = input.readAll();
+    input.close();
+    QStringList lines = s.split('\n');
+    foreach(s, lines)
+    {
+        s.remove('\n');
+        s = s.trimmed();
+        if(s.isEmpty() || s.startsWith('#'))
+        {
+            continue;
+        }
+
+        if(s.contains(".desktop "))
+        {
+            QStringList fields = s.split(' ');
+            if(fields.count() >= 4 && fields.at(0) == "obj")
             {
-                QStringList fields = s.split(' ');
-                if(fields.count() >= 4 && fields.at(0) == "obj")
+                desktopFiles.append(fields.at(1));
+            }
+        }
+        else if(s.contains("/usr/share/icons/") || s.contains("/usr/share/pixmaps/"))
+        {
+            QStringList fields = s.split(' ');
+            if(fields.count() >= 4 && fields.at(0) == "obj")
+            {
+                if((s.contains("128x128") || s.endsWith(".svg")) && bigIcons.count() && (bigIcons.first().endsWith(".svg") == false))
                 {
-                    desktopFiles.append(fields.at(1));
+                    bigIcons.prepend(fields.at(1));
+                }
+                else
+                {
+                    bigIcons.append(fields.at(1));
+                }
+
+                if(s.contains("32x32") || s.endsWith(".svg"))
+                {
+                    smallIcons.prepend(fields.at(1));
+                }
+                else
+                {
+                    smallIcons.append(fields.at(1));
                 }
             }
-            else if(s.contains("/usr/share/icons/") || s.contains("/usr/share/pixmaps/"))
-            {
-                QStringList fields = s.split(' ');
-                if(fields.count() >= 4 && fields.at(0) == "obj")
-                {
-                    if((s.contains("128x128") || s.endsWith(".svg")) && bigIcons.count() && (bigIcons.first().endsWith(".svg") == false))
-                    {
-                        bigIcons.prepend(fields.at(1));
-                    }
-                    else
-                    {
-                        bigIcons.append(fields.at(1));
-                    }
+        }
+    }
 
-                    if(s.contains("32x32") || s.endsWith(".svg"))
-                    {
-                        smallIcons.prepend(fields.at(1));
-                    }
-                    else
-                    {
-                        smallIcons.append(fields.at(1));
-                    }
-                }
-            }
-        }
+    if(bigIcons.count())
+    {
+        appicon = bigIcons.first();
+    }
+    else
+    {
+        appicon.clear();
+    }
 
-        if(bigIcons.count())
-        {
-            appicon = bigIcons.first();
-        }
-        else
-        {
-            appicon.clear();
-        }
-
-        if(smallIcons.count())
-        {
-            composite->setIcon(smallIcons.first());
-            hasIcon = true;
-        }
+    if(smallIcons.count())
+    {
+        composite->setIcon(smallIcons.first());
+        hasIcon = true;
     }
 
     return appicon;

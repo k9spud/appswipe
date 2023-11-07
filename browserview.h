@@ -118,6 +118,7 @@ protected:
     QTimer animationTimer;
     QTimer longPressTimer;
     QPoint startPress;
+    QPoint startLongPress;
     bool eatPress;
     virtual void contextMenuEvent(QContextMenuEvent *event) override;
 
