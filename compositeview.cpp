@@ -85,6 +85,12 @@ void CompositeView::navigateTo(QString text, bool changeHistory, bool feelingLuc
         return;
     }
 
+    if(text == url() && feelingLucky == false)
+    {
+        reload(false);
+        return;
+    }
+
     if(text.startsWith("clip:"))
     {
        QClipboard* clip = qApp->clipboard();
