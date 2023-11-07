@@ -39,18 +39,18 @@ K9Portage::K9Portage(QObject *parent) : QObject(parent)
     var_ref.setPattern("\\$\\{([A-z, 0-9, _]+)\\}");
 
     // see https://devmanual.gentoo.org/general-concepts/dependencies/
-    dependBasicRE.setPattern("([^~=><].*)/([^:\\n]+)$");
-    dependKeywordsBasicRE.setPattern("([^~=><].*)/([^:\\n\\s]+)\\s+(.+)$");
-    dependVersionRE.setPattern("(~|=|>=|<=|>|<)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*)");
-    dependKeywordsVersionRE.setPattern("(~|=|>=|<=|>|<)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*)\\s+(.+)$");
-    dependSlotRE.setPattern("([^~=><].*)/([^:\\n]+):([^:\\n]+)");
-    dependKeywordsSlotRE.setPattern("([^~=><].*)/([^:\\n]+):([^:\\n\\s]+)\\s+(.+)$");
-    dependRepositoryRE.setPattern("(~|=|>=|<=|>|<)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*):([^:]*):([^:\\n]+)");
-    dependKeywordsRepositoryRE.setPattern("(~|=|>=|<=|>|<)(.+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*):([^:]*):([^:\\n\\s]+)\\s+(.+)$");
+    dependBasicRE.setPattern("([^~=><][^/]*)/([^:\\n]+)$");
+    dependKeywordsBasicRE.setPattern("([^~=><][^/]*)/([^:\\n\\s]+)\\s+(.+)$");
+    dependVersionRE.setPattern("(~|=|>=|<=|>|<)([^/]+)/([^:]+)-([0-9\\*][0-9\\-\\.A-z\\*]*)");
+    dependKeywordsVersionRE.setPattern("(~|=|>=|<=|>|<)([^/]+)/([^:]+)-([0-9\\*][0-9\\-\\.A-z\\*]*)\\s+(.+)$");
+    dependSlotRE.setPattern("([^~=><][^/]*)/([^:\\n]+):([^:\\n]+)");
+    dependKeywordsSlotRE.setPattern("([^~=><][^/]*)/([^:\\n]+):([^:\\n\\s]+)\\s+(.+)$");
+    dependRepositoryRE.setPattern("(~|=|>=|<=|>|<)([^/]+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*):([^:]*):([^:\\n]+)");
+    dependKeywordsRepositoryRE.setPattern("(~|=|>=|<=|>|<)([^/]+)/(.+)-([0-9\\*][0-9\\-\\.A-z\\*]*):([^:]*):([^:\\n\\s]+)\\s+(.+)$");
 
-    dependLinkRE.setPattern("(!!>=|!!<=|!!~|!!=|!!>|!!<|!>=|!<=|!~|!=|!>|!<|!!|>=|<=|~|=|>|<|!)(.+)/(.+)-([0-9\\*][^\\n]*)");
-    dependLinkSlotRE.setPattern("(!!>=|!!<=|!!~|!!=|!!>|!!<|!>=|!<=|!~|!=|!>|!<|!!|>=|<=|~|=|>|<|!|)(.+)/(.+):([^\\n]+)");
-    dependLinkAppRE.setPattern("(!!|!|)(.+)/([^\\[\\]\\n]+)(\\[[^\\n]+\\]|)");
+    dependLinkRE.setPattern("(!!>=|!!<=|!!~|!!=|!!>|!!<|!>=|!<=|!~|!=|!>|!<|!!|>=|<=|~|=|>|<|!)([^/]+)/([^:]+)-([0-9\\*][^\\n]*)");
+    dependLinkSlotRE.setPattern("(!!>=|!!<=|!!~|!!=|!!>|!!<|!>=|!<=|!~|!=|!>|!<|!!|>=|<=|~|=|>|<|!|)([^/]+)/([^:]+):([^\\n]+)");
+    dependLinkAppRE.setPattern("(!!|!|)([^/]+)/([^\\[\\]\\n]+)(\\[[^\\n]+\\]|)");
 
 #if defined(__x86_64__)
     arch = "amd64";
