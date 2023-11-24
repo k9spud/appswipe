@@ -24,7 +24,6 @@
 #include <QVariant>
 #include <QHash>
 #include <QRegularExpression>
-#include <QRegularExpressionMatch>
 #include <QSqlDatabase>
 
 class K9Portage : public QObject
@@ -36,48 +35,14 @@ public:
 
     QString arch;
 
-    void setRepoFolder(QString path);
-    QString repoFolder;
-    QStringList repos;
-
-    QStringList categories;
-
-    void setVersion(QString version);
-    VersionString version;
-    QHash<QString, QString> vars;
-    QVariant var(QString key);
-
-    void ebuildReader(QString fileName);
-    void parseVerCut(QString& value);
-    QRegularExpression verCutSingle;
-    QRegularExpression verCutRange;
-
     QRegularExpression separator;
     QRegularExpression digitVersion;
     QRegularExpression alphaVersion;
 
-    QRegularExpression stringAssignment;
-    QRegularExpression variableAssignment;
-    QRegularExpression var_ref;
-
-    QRegularExpression dependBasicRE;
     QRegularExpression dependKeywordsBasicRE;
-    QRegularExpression dependVersionRE;
     QRegularExpression dependKeywordsVersionRE;
-    QRegularExpression dependSlotRE;
     QRegularExpression dependKeywordsSlotRE;
-    QRegularExpression dependRepositoryRE;
     QRegularExpression dependKeywordsRepositoryRE;
-
-    QRegularExpression dependLinkRE;
-    QRegularExpression dependLinkSlotRE;
-    QRegularExpression dependLinkAppRE;
-
-    QString linkDependency(QString input, QString& category, QString& package);
-
-    void applyMasks(QSqlDatabase& db, QString atomFilter = "");
-    void readMaskFile(QSqlQuery& query, QString fileName, QString atomFilter = "");
-    void emergedApp(QString app);
 
     void autoKeyword(QString app, QString op = "");
     bool foundKeyworded(QString fileName, QString category, QString package, QString version, QString repo, QString slot, QString subslot, QString keywords);
@@ -95,9 +60,6 @@ signals:
 
 
 protected:
-    QString equalFilter(QString& category,QString& package, QString& version);
-    QString anyRevisionFilter(QString& category,QString& package, QString& version);
-    QString comparisonFilter(QString& filter, QString& category, QString& package, QString& version);
 };
 
 #endif // K9PORTAGE_H
