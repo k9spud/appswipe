@@ -29,7 +29,7 @@ void progress(int i)
 {
     if(showProgress)
     {
-        error << i << Qt::endl;
+        error << "progress " << i << Qt::endl;
     }
 }
 
