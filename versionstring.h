@@ -20,13 +20,15 @@
 #include <QString>
 #include <QVector>
 
+#define MAXVX 10
+
 class VersionString
 {
 public:
     VersionString();
 
     void parse(QString input);
-    bool match(QString filter, QString version2);
+    bool match(QString filter, QString version2) const;
 
     QString cut(int index);
     QString cutInternalVx(int index);
@@ -58,6 +60,7 @@ public:
 
     QVector<QString> components; //verCut compatible version components
     QVector<QString> vx; // internal V1.V2.V3.V4.V5.rX version components
+    QVector<qint64> vi;
 
 protected:
     QString escapeSql(QString s);

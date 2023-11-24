@@ -20,7 +20,6 @@
 
 #include <QRegularExpression>
 #include <QDebug>
-#define MAXVX 10
 
 /*
 Refer to https://devmanual.gentoo.org/ebuild-writing/file-format/index.html
@@ -61,6 +60,7 @@ void VersionString::parse(QString input)
     int oldPosition = -1;
     components.clear();
     vx.clear();
+    vx.reserve(MAXVX);
     while(position < input.count() && position != oldPosition)
     {
         oldPosition = position;
@@ -162,26 +162,67 @@ void VersionString::parse(QString input)
     // revision number always as least significant Vx column (V10). If no revision number specified,
     // it will be defaulted to "0" instead of NULL (code above during declaration of 'revision' variable).
     vx.append(revision);
+
+    qint64 i;
+    bool ok;
+    vi.clear();
+    vi.reserve(MAXVX);
+    foreach(QString s, vx)
+    {
+        i = s.toLongLong(&ok);
+        if(ok == false)
+        {
+//            qDebug() << "couldn't convert:" << s;
+            i = 0;
+        }
+        vi.append(i);
+    }
 }
 
-bool VersionString::match(QString filter, QString version2)
+bool VersionString::match(QString filter, QString version2) const
 {
-    if(filter == "=")
+    if(filter == "=" && version2.contains("*") == false)
     {
         return version2 == pvr;
     }
 
     VersionString vb;
     vb.parse(version2);
-    QString a;
-    QString b;
+    int a;
+    int b;
     int i;
+
+    if(filter == "=")
+    {
+        for(i = 0; i < vb.vx.count() && i < vx.count(); i++)
+        {
+            a = vi.at(i);
+            b = vb.vi.at(i);
+            if(vb.vx.at(i).endsWith('*'))
+            {
+                if(a == b)
+                {
+                    return true;
+                }
+                return false;
+            }
+
+            if(a != b)
+            {
+                return false;
+            }
+        }
+
+        // both versions are equal
+        return true;
+    }
+
     if(filter == "<=")
     {
         for(i = 0; i < vb.vx.count() && i < vx.count(); i++)
         {
-            a = vx.at(i);
-            b = vb.vx.at(i);
+            a = vi.at(i);
+            b = vb.vi.at(i);
             if(a > b)
             {
                 return false;
@@ -201,8 +242,8 @@ bool VersionString::match(QString filter, QString version2)
     {
         for(i = 0; i < vb.vx.count() && i < vx.count(); i++)
         {
-            a = vx.at(i);
-            b = vb.vx.at(i);
+            a = vi.at(i);
+            b = vb.vi.at(i);
             if(a < b)
             {
                 return false;
@@ -223,8 +264,8 @@ bool VersionString::match(QString filter, QString version2)
     {
         for(i = 0; i < vb.vx.count() && i < vx.count(); i++)
         {
-            a = vx.at(i);
-            b = vb.vx.at(i);
+            a = vi.at(i);
+            b = vb.vi.at(i);
             if(a > b)
             {
                 return false;
@@ -244,8 +285,8 @@ bool VersionString::match(QString filter, QString version2)
     {
         for(i = 0; i < vb.vx.count() && i < vx.count(); i++)
         {
-            a = vx.at(i);
-            b = vb.vx.at(i);
+            a = vi.at(i);
+            b = vb.vi.at(i);
             if(a < b)
             {
                 return false;
@@ -265,8 +306,8 @@ bool VersionString::match(QString filter, QString version2)
     {
         for(i = 0; i < (MAXVX-1) && i < vb.vx.count() && i < vx.count(); i++)
         {
-            a = vx.at(i);
-            b = vb.vx.at(i);
+            a = vi.at(i);
+            b = vb.vi.at(i);
             if(a != b)
             {
                 return false;
