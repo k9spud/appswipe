@@ -10,28 +10,29 @@ upgrading apps.
 
 ![Screenshot](https://github.com/k9spud/appswipe/assets/39664841/754e807d-4e57-457e-8d54-554d38e8a070)
 
-What's New in v1.1.59?
+What's New in v1.1.65?
 ======================
-Added right click "Copy flag to clipboard" context menu for USE flags.
+Lots more mask logic. We now load package.mask, package.unmask, and 
+package.accept_keywords -- either as standalone files, or as a directory of
+files. We also load them not only from /etc/portage, but from the selected repo
+profile and all profile parent folders too.
 
-Viewing an app that is already installed now highlights dependencies that
-aren't installed in red (which normally shouldn't happen) and dependencies
-that may be upgradable in yellow. Note that this does not do any checking
-whether the newer versions satisfy all dependency constraints however.
+`Reload Database` should be slightly faster now. No longer doing mask logic
+in SQL and instead do it all in C++. Keeping it all in C++ allows us to do
+fast-path optimization for masks that do not require complex version number 
+comparisons or other shenanigans requiring a regular expression match.
 
-Improved left click and hold to work a little easier. Previously, if you 
-moved the mouse cursor a little too much (easy to do on a touch pad), it 
-would fail to open the context menu.
+Added the `appswipetransport` sub-process. When you go to view an `app:` page,
+this external process now does all the work of querying the database and
+producing formatted HTML. After removing all this code from the main GUI app,
+there is a noticeable memory footprint reduction. The downside is loading 
+an `app:` page might be a little more janky than before, since it has to spin
+up the external process. 
 
-Pressing enter in the URL input box repeatedly now does a soft reload
-instead of navigating to the same URL over again. This prevents the 
-Back history from getting filled up with the same URL multiple times.
-
-App icons that are too big (>33% of the view) are now forced to 33% of the 
-view width (solves `app:app-editors/vscodium` looking like crap).
-
-Fixed a dependency parsing bug where a slot number containing a "-"
-could confuse the regular expression used to sort it out.
+The `update:` page previously failed to correctly handle updates for 
+packages that have multiple slots installed. This was a big problem for the
+`dev-qt/*` packages now that we have Qt 5 and Qt 6 slots typically installed
+and each requiring updates within their respective slot. Fixed.
 
 Help Get the Word Out
 =====================
