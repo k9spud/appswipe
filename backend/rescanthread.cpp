@@ -17,6 +17,7 @@
 #include "rescanthread.h"
 #include "datastorage.h"
 #include "k9portage.h"
+#include "k9portagemasks.h"
 #include "globals.h"
 #include "versionstring.h"
 
@@ -259,9 +260,6 @@ values
         progress(100.0f * static_cast<float>(progressCount++) / static_cast<float>(folderCount));
     }
     db.commit();
-    output << "Applying masks..." << Qt::endl;
-    int progressCountMasks = 100.0f * static_cast<float>(progressCount++) / static_cast<float>(folderCount);
-    portage->applyMasks(db, progressCountMasks);
     progress(100);
     output << "Done." << Qt::endl;
 }
@@ -383,10 +381,6 @@ values
     }
 
     db.commit();
-    progress(progressCount++);
-
-    portage->applyMasks(db, progressCount, atom);
-
     progress(100);
 }
 
@@ -605,7 +599,7 @@ bool RescanThread::importInstalledPackage(QSqlQuery* query, QString category, QS
     query->bindValue(10, downloadSize);
     query->bindValue(11, keywords);
     query->bindValue(12, iuse);
-    query->bindValue(13, false); /* not masked if installed */
+    query->bindValue(13, 0); /* not masked if installed */
     query->bindValue(14, published);
     query->bindValue(15, status);
     query->bindValue(16, QVariant(subslot));
@@ -715,7 +709,7 @@ bool RescanThread::importRepoPackage(QSqlQuery* query, QString category, QString
     query->bindValue(10, downloadSize);
     query->bindValue(11, keywords);
     query->bindValue(12, portage->var("IUSE"));
-    query->bindValue(13, 0); /* default to not masked for now -- masks applied later as last step */
+    query->bindValue(13, portageMasks->isMasked(category, packageName, slot, subslot, portage->version, keywords)); /* default to not masked for now -- masks applied later as last step */
     query->bindValue(14, published);
     query->bindValue(15, status);
     query->bindValue(16, QVariant(subslot));
@@ -768,10 +762,10 @@ bool RescanThread::importMetaCache(QSqlQuery* query, QString category, QString p
         return true;
     }
 
-    portage->ebuildReader(metaCacheFilePath);
+    portage->md5cacheReader(metaCacheFilePath);
 
     downloadSize = -1;
-    input.setFileName(QString("/var/db/pkg/%1/%2-%3/SIZE").arg(category, packageName,  portage->version.pvr));
+    input.setFileName(QString("/var/db/pkg/%1/%2-%3/SIZE").arg(category, packageName, portage->version.pvr));
     if(input.open(QIODevice::ReadOnly))
     {
         data = input.readAll();
@@ -821,7 +815,7 @@ bool RescanThread::importMetaCache(QSqlQuery* query, QString category, QString p
     query->bindValue(10, downloadSize);
     query->bindValue(11, keywords);
     query->bindValue(12, portage->var("IUSE"));
-    query->bindValue(13, 0); /* default to not masked for now -- masks applied later as last step */
+    query->bindValue(13, portageMasks->isMasked(category, packageName, slot, subslot, portage->version, keywords)); /* default to not masked for now -- masks applied later as last step */
     query->bindValue(15, status);
     query->bindValue(16, QVariant(subslot));
     query->bindValue(17, portage->version.cutInternalVx(0));
