@@ -11,7 +11,9 @@ CONFIG -= app_bundle
 SOURCES += \
         datastorage.cpp \
         globals.cpp \
+        k9complexmask.cpp \
         k9portage.cpp \
+        k9portagemasks.cpp \
         main.cpp \
         rescanthread.cpp \
         versionstring.cpp
@@ -24,7 +26,9 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 HEADERS += \
     datastorage.h \
     globals.h \
+    k9complexmask.h \
     k9portage.h \
+    k9portagemasks.h \
     main.h \
     rescanthread.h \
     versionstring.h
