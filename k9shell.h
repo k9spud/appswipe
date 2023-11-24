@@ -29,8 +29,10 @@ public:
     explicit K9Shell(QObject *parent = nullptr);
 
     void findBackend();
+    void findTransport();
     void findBzip2();
     QString backend;
+    QString transport;
     QString doas;
     QString bzip2;
 

@@ -27,6 +27,7 @@ K9Shell* shell = nullptr;
 K9Shell::K9Shell(QObject *parent) : QProcess(parent)
 {
     findBackend();
+    findTransport();
 
     doas = "echo"; // fall back to echoing commands if sudo and doas are missing from the system
 
@@ -69,6 +70,32 @@ void K9Shell::findBackend()
         return;
     }
     qDebug() << "Couldn't find appswipebackend binary!";
+}
+
+void K9Shell::findTransport()
+{
+    QFileInfo fi;
+    fi.setFile(qApp->applicationDirPath() + "/appswipetransport");
+    if(fi.exists())
+    {
+        transport = fi.canonicalFilePath();
+        return;
+    }
+
+    fi.setFile("/usr/bin/appswipetransport");
+    if(fi.exists())
+    {
+        transport = fi.canonicalFilePath();
+        return;
+    }
+
+    fi.setFile("/usr/local/bin/appswipetransport");
+    if(fi.exists())
+    {
+        transport = fi.canonicalFilePath();
+        return;
+    }
+    qDebug() << "Couldn't find appswipetransport binary!";
 }
 
 void K9Shell::findBzip2()
