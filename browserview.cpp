@@ -2445,7 +2445,6 @@ void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString sear
     QString category;
     QString app;
     QString package;
-    QString slot;
     QString version;
     QString description;
     QString keywords;
@@ -2454,7 +2453,6 @@ void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString sear
     QString bestPackage;
     QString nextCategory;
     QString nextPackage;
-    QString nextSlot;
 
     QString bestMatchApps;
     QString obsoletedApps;
@@ -2480,7 +2478,6 @@ void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString sear
     }
     category = query->value(0).toString();
     package = query->value(1).toString();
-    slot = query->value(8).toString();
     installedVersions.clear();
     obsoletedVersions.clear();
     latestUnmaskedVersion.clear();
@@ -2525,10 +2522,9 @@ void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString sear
         {
             nextCategory = query->value(0).toString();
             nextPackage = query->value(1).toString();
-            nextSlot = query->value(8).toString();
         }
 
-        if(exitLoop || nextCategory != category || nextPackage != package || nextSlot != slot)
+        if(exitLoop || nextCategory != category || nextPackage != package)
         {
             if(package.isEmpty() == false)
             {
@@ -2585,7 +2581,6 @@ void BrowserView::showQueryResult(QSqlQuery* query, QString result, QString sear
 
             category = nextCategory;
             package = nextPackage;
-            slot = nextSlot;
             installedVersions.clear();
             obsoletedVersions.clear();
             latestUnmaskedVersion.clear();
