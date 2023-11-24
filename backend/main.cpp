@@ -17,6 +17,7 @@
 #include "main.h"
 #include "globals.h"
 #include "k9portage.h"
+#include "k9portagemasks.h"
 #include "datastorage.h"
 #include "rescanthread.h"
 
@@ -44,6 +45,9 @@ int main(int argc, char *argv[])
 
     portage = new K9Portage();
     portage->setRepoFolder("/var/db/repos/");
+
+    portageMasks = new K9PortageMasks();
+    portageMasks->loadAll(portage->repos);
 
     ds = new DataStorage();
     ds->openDatabase();
