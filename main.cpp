@@ -35,7 +35,6 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
 
     portage = new K9Portage();
-    portage->setRepoFolder("/var/db/repos/");
 
     ds = new DataStorage();
     ds->openDatabase();
