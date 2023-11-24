@@ -27,6 +27,7 @@
 #include <QLabel>
 #include <QScrollBar>
 #include <QDir>
+#include <QDebug>
 
 CompositeView::CompositeView(QWidget* parent) : QWidget(parent)
 {
@@ -366,7 +367,9 @@ void CompositeView::load()
     {
         delayLoading = false;
         navigateTo(delayState.target);
-        if(delayScrolling)
+        if(delayScrolling &&
+	   delayState.target.startsWith("app:") == false &&
+           delayState.target.startsWith("files:") == false)
         {
             qApp->processEvents();
             delayScrolling = false;
