@@ -85,3 +85,38 @@ create table if not exists PACKAGE (
     STATUS integer,
     SUBSLOT text
 );
+
+-- PACKAGE.STATUS: 0 = unknown, 1 = testing, 2 = stable
+-- PACKAGE.MASKED:  bit 0: 1 = masked 0 = not masked
+--                  bit 1: 1 = keyword masked (testing), 0 = keyworded
+--                  bit 2: 1 = keyword masked (unknown/unsupported), 0 = keyworded
+--                  bit 3: 1 = keyword masked (broken), 0 = keyworded
+
+-- create table if not exists MASKFILE (
+--     MASKFILEID integer primary key autoincrement,
+--     FILEPATH text,
+--     LASTMODIFIED integer
+-- );
+
+-- create table if not exists MASK (
+--     MASKID integer primary key autoincrement,
+--     MASKFILEID integer,
+--     MASK text,
+--     CATEGORY text,
+--     PACKAGE text,
+--     BLOCKOP text,
+--     VERSIONOP text,
+--     V1 int,
+--     V2 int,
+--     V3 int,
+--     V4 int,
+--     V5 int,
+--     V6 int,
+--     V7 int,
+--     V8 int,
+--     V9 int,
+--     V10 int,
+--     SLOT text,
+--     COMMENTS text
+-- );
+
