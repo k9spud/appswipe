@@ -104,6 +104,8 @@ protected slots:
     void processReadStandardOutput(void);
 
 protected:
+    void processReadOutput(bool readLast, int exitCode, QProcess::ExitStatus exitStatus);
+
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
@@ -122,8 +124,6 @@ protected:
     bool eatPress;
     virtual void contextMenuEvent(QContextMenuEvent *event) override;
 
-    QHash<QString, QString> iconMap;    // category type, icon resource file name
-
     QString lastSearch;
     QString oldLink;
     QString context;
@@ -136,14 +136,10 @@ protected:
     void showUpdates(QSqlQuery* query, QString header, QString filter);
     void showQueryResult(QSqlQuery* query, QString header, QString search, bool feelingLucky = false);
     void printApp(QString& result, QString& app, QString& description, QString& latestVersion, QStringList& installedVersions, QStringList& obsoletedVersions);
-    QString findAppIcon(bool& hasIcon, QString category, QString package, QString version);
-    QString printDependencies(QStringList dependencies, QSqlQuery& query, bool flagMissing = false);
-    int depMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex);
-    int outerDepMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex = 0);
-    void skipNode(QStringList& nodes, int& index);
-    void removeDuplicateDeps(QStringList& target, QStringList& source);
 
     QProcess* process;
+    bool processReadFirst;
+    QString oldTitle;
 };
 
 #endif // BROWSERVIEW_H
