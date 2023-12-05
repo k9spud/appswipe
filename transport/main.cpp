@@ -210,6 +210,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     QStringList optionalDeps;
     QStringList installtimeDeps;
     int firstUnmasked = -1;
+    int firstMaskedTesting = -1;
 
     QString versionSize;
 
@@ -239,9 +240,13 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             {
                 keywords = query.value(9).toString();
                 masked = query.value(13).toInt();
-                if(masked == 0)// && keywords.contains(portage->arch))
+                if(masked == 0)
                 {
                     firstUnmasked = query.at();
+                }
+                else if(masked == 2 && firstMaskedTesting == -1) // testing, but still masked
+                {
+                    firstMaskedTesting = query.at();
                 }
             }
 
@@ -253,7 +258,15 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                 }
                 else
                 {
-                    query.first();
+                    if(firstMaskedTesting != -1)
+                    {
+                        firstUnmasked = firstMaskedTesting;
+                        query.seek(firstUnmasked);
+                    }
+                    else
+                    {
+                        query.first();
+                    }
                 }
                 break;
             }
@@ -788,6 +801,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     output << ("<P>&nbsp;<BR></P>\n");
     output << ("</BODY>\n<HTML>\n") << Qt::endl;
     error << "title " << package << Qt::endl;
+    error << "isWorld " << (isWorld ? "1" : "0") << Qt::endl;
 }
 
 int depMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex)
