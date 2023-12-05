@@ -10,29 +10,24 @@ upgrading apps.
 
 ![Screenshot](https://github.com/k9spud/appswipe/assets/39664841/754e807d-4e57-457e-8d54-554d38e8a070)
 
-What's New in v1.1.65?
+What's New in v1.1.66?
 ======================
-Lots more mask logic. We now load package.mask, package.unmask, and 
-package.accept_keywords -- either as standalone files, or as a directory of
-files. We also load them not only from /etc/portage, but from the selected repo
-profile and all profile parent folders too.
+Fixed bug introduced in v1.1.65 where installing/upgrading a non-@world 
+package would fail to use the --oneshot command line option for emerge.
+If you clicked to install any individual packages in v1.1.65,
+you probably had those packages added to @world. Sorry!
 
-`Reload Database` should be slightly faster now. No longer doing mask logic
-in SQL and instead do it all in C++. Keeping it all in C++ allows us to do
-fast-path optimization for masks that do not require complex version number 
-comparisons or other shenanigans requiring a regular expression match.
+Added code for text interaction lock-out during a page load. Now 
+that pages load partially in a separate process, it became possible
+to quickly click a link and have the remaining portion of the page load 
+inserted at that position rather than appending to the end. The text
+interaction lock-out should prevent such visual mistake from happening.
 
-Added the `appswipetransport` sub-process. When you go to view an `app:` page,
-this external process now does all the work of querying the database and
-producing formatted HTML. After removing all this code from the main GUI app,
-there is a noticeable memory footprint reduction. The downside is loading 
-an `app:` page might be a little more janky than before, since it has to spin
-up the external process. 
-
-The `update:` page previously failed to correctly handle updates for 
-packages that have multiple slots installed. This was a big problem for the
-`dev-qt/*` packages now that we have Qt 5 and Qt 6 slots typically installed
-and each requiring updates within their respective slot. Fixed.
+When viewing an app that hasn't been installed at all on the system, App
+Swipe is supposed to display information about the best version of the 
+app. Prior releases failed to select the latest `testing` version when 
+there are no `stable` versions available. Instead, it was showing the 9999 
+live build. Fixed.
 
 Help Get the Word Out
 =====================
