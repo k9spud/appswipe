@@ -354,8 +354,7 @@ void K9Portage::ebuildReader(QString fileName)
     QTextStream in(&input);
     while(in.atEnd() == false)
     {
-        s = in.readLine();
-        s = s.trimmed();
+        s = in.readLine().trimmed();
         if(s.isEmpty() || s.startsWith('#'))
         {
             continue;
@@ -425,8 +424,7 @@ void K9Portage::md5cacheReader(QString fileName)
     int i;
     while(in.atEnd() == false)
     {
-        s = in.readLine();
-        s = s.trimmed();
+        s = in.readLine().trimmed();
         if(s.isEmpty() || s.startsWith('#'))
         {
             continue;

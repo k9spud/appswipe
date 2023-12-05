@@ -57,9 +57,10 @@ public:
     QVector<K9ComplexMask> acceptKeywordsComplex; // everything else
     QStringList acceptKeywordsComplexAllowed; // architectures (keywords) that are allowed by this accept_keywords rule
 
-    QStringList profileFolders;
-
 protected:
+
+private:
+    QStringList profileFolders; // used to keep track of which profile folders we've already loaded so we don't get into an infinite loop
 };
 
 #endif // K9PORTAGEMASKS_H
