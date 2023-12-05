@@ -402,6 +402,7 @@ void BrowserView::viewProcess(QString cmd, QStringList options)
         }
         process->start(cmd, options, QIODevice::ReadWrite);
     }
+    setTextInteractionFlags(Qt::NoTextInteraction);
 }
 
 void BrowserView::stop()
@@ -415,10 +416,12 @@ void BrowserView::stop()
     {
         kill(process->processId(), SIGINT);
     }
+    setTextInteractionFlags(Qt::TextBrowserInteraction);
 }
 
 void BrowserView::processReadStandardError()
 {
+    bool ok;
     QString s = process->readAllStandardError();
 
     QStringList cmds = s.split("\n");
@@ -438,11 +441,23 @@ void BrowserView::processReadStandardError()
         else if(s.startsWith("progress "))
         {
             s = s.mid(9).trimmed();
-            bool ok;
             int i = s.toInt(&ok);
             if(ok)
             {
                 emit loadProgress(i);
+            }
+        }
+        else if(s.startsWith("isWorld "))
+        {
+            s = s.mid(8).trimmed();
+            int i = s.toInt(&ok);
+            if(ok)
+            {
+                isWorld = (i != 0);
+            }
+            else
+            {
+                isWorld = false;
             }
         }
     }
@@ -456,6 +471,7 @@ void BrowserView::processFinished(int exitCode, QProcess::ExitStatus exitStatus)
         emit titleChanged(documentTitle());
     }
     process->close();
+    setTextInteractionFlags(Qt::TextBrowserInteraction);
 
     emit loadFinished();
 }
