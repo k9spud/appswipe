@@ -167,8 +167,10 @@ void VersionString::parse(QString input)
     bool ok;
     vi.clear();
     vi.reserve(MAXVX);
-    foreach(QString s, vx)
+    const int vxCount = vx.count();
+    for(int j = 0; j < vxCount; j++)
     {
+        s = vx.at(j);
         i = s.toLongLong(&ok);
         if(ok == false)
         {
