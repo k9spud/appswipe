@@ -376,7 +376,11 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
         {
             QString worldSet = input.readAll();
             input.close();
-            if(worldSet.contains(search + "\n"))
+            if(worldSet.contains(QString("%1/%2\n").arg(category, package)) ||
+               worldSet.contains(QString("%1/%2:%3\n").arg(category, package, slot)) ||
+               worldSet.contains(QString("%1/%2:%3/%4\n").arg(category, package, slot, subslot)) ||
+               worldSet.contains(QString("%1/%2::%3\n").arg(category, package, repo)) ||
+               worldSet.contains(QString("%1/%2-%3\n").arg(category, package, version)))
             {
                 isWorld = true;
             }
