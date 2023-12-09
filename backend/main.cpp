@@ -19,7 +19,7 @@
 #include "k9portage.h"
 #include "k9portagemasks.h"
 #include "datastorage.h"
-#include "rescanthread.h"
+#include "importvdb.h"
 
 #include <signal.h>
 #include <QCoreApplication>
