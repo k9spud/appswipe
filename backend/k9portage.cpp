@@ -21,7 +21,6 @@
 #include <QDir>
 #include <QDebug>
 #include <QFile>
-#include <QTextStream>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -129,21 +128,31 @@ void K9Portage::setRepoFolder(QString path)
     dir.setPath(repoFolder);
     dir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
     repos.clear();
-    foreach(QString repoDir, dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot))
+
+    int i, j;
+    QStringList repoFolders = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    const int repoFolderCount = repoFolders.count();
+    for(i = 0; i < repoFolderCount; i++)
     {
-        repos.append(repoFolder + repoDir + "/");
+        repos.append(QString("%1%2/").arg(repoFolder, repoFolders.at(i)));
     }
 
     categories.clear();
-    foreach(QString repo, repos)
+
+    QString s;
+    QStringList repoCategories;
+    for(i = 0; i < repoFolderCount; i++)
     {
-        dir.setPath(repo);
+        dir.setPath(repos.at(i));
         dir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
-        foreach(QString cat, dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot))
+        repoCategories = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        const int repoCategoriesCount = repoCategories.count();
+        for(j = 0; j < repoCategoriesCount; j++)
         {
-            if(categories.contains(cat) == false)
+            s = repoCategories.at(j);
+            if(categories.contains(s) == false)
             {
-                categories.append(cat);
+                categories.append(s);
             }
         }
     }
@@ -199,7 +208,7 @@ void K9Portage::parseVerCut(QString& value)
     } while(matchFound);
 }
 
-void K9Portage::emergedApp(QString app)
+void K9Portage::emergedApp(QStringList appList)
 {
     QSqlDatabase db;
     if(QSqlDatabase::contains("GuiThread") == false)
@@ -218,22 +227,16 @@ void K9Portage::emergedApp(QString app)
     db.setDatabaseName(ds->storageFolder + ds->databaseFileName);
     db.open();
 
-    QStringList atoms;
-    if(app.contains(' '))
-    {
-        atoms = app.split(' ');
-    }
-    else
-    {
-        atoms.append(app);
-    }
-
     QSqlQuery query(db);
     QSqlQuery updatePackage(db);
     QSqlQuery deletePackage(db);
-    query.prepare("select PACKAGEID, VERSION, INSTALLED, OBSOLETED, DOWNLOADSIZE from PACKAGE where CATEGORYID=(select CATEGORYID from CATEGORY where CATEGORY=?) and PACKAGE=?");
-    updatePackage.prepare("update PACKAGE set INSTALLED=?, DOWNLOADSIZE=? where PACKAGEID=?");
-    deletePackage.prepare("delete from PACKAGE where PACKAGEID=?");
+    query.prepare(QStringLiteral(R"EOF(
+select PACKAGEID, VERSION, INSTALLED, OBSOLETED, DOWNLOADSIZE
+from PACKAGE
+where CATEGORYID=(select CATEGORYID from CATEGORY where CATEGORY=?) and PACKAGE=?
+)EOF"));
+    updatePackage.prepare(QStringLiteral("update PACKAGE set INSTALLED=?, DOWNLOADSIZE=? where PACKAGEID=?"));
+    deletePackage.prepare(QStringLiteral("delete from PACKAGE where PACKAGEID=?"));
 
     QStringList x;
     QString category;
@@ -241,9 +244,19 @@ void K9Portage::emergedApp(QString app)
     QFile input;
     QString data;
     bool ok;
-    foreach(QString atom, atoms)
+
+    qint64 packageId;
+    qint64 installed;
+    QString version;
+    QString installedFilePath;
+    int downloadSize;
+    QFileInfo fi;
+    bool obsoleted;
+
+    const int appCount = appList.count();
+    for(int i = 0; i < appCount; i++)
     {
-        x = atom.split('/');
+        x = appList.at(i).split('/');
         category = x.first();
         packageName = x.last();
         query.bindValue(0, category);
@@ -253,14 +266,6 @@ void K9Portage::emergedApp(QString app)
         {
             return;
         }
-
-        qint64 packageId;
-        qint64 installed;
-        QString version;
-        QString installedFilePath;
-        int downloadSize;
-        QFileInfo fi;
-        bool obsoleted;
 
         do
         {
@@ -347,14 +352,18 @@ void K9Portage::ebuildReader(QString fileName)
         return;
     }
 
-    QString s;
+    QString s = input.readAll();
+    input.close();
+
     QString key;
     QString value;
     QRegularExpressionMatch match;
-    QTextStream in(&input);
-    while(in.atEnd() == false)
+
+    QStringList lines = s.split('\n');
+    const int lineCount = lines.count();
+    for(int line = 0; line < lineCount; line++)
     {
-        s = in.readLine().trimmed();
+        s = lines.at(line).trimmed();
         if(s.isEmpty() || s.startsWith('#'))
         {
             continue;
@@ -416,15 +425,17 @@ void K9Portage::md5cacheReader(QString fileName)
         return;
     }
 
-    QString s;
+    QString s = input.readAll();
+    input.close();
+
+    int i;
     QString key;
     QString value;
-    QRegularExpressionMatch match;
-    QTextStream in(&input);
-    int i;
-    while(in.atEnd() == false)
+    QStringList lines = s.split('\n');
+    const int lineCount = lines.count();
+    for(int line = 0; line < lineCount; line++)
     {
-        s = in.readLine().trimmed();
+        s = lines.at(line).trimmed();
         if(s.isEmpty() || s.startsWith('#'))
         {
             continue;

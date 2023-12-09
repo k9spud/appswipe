@@ -33,20 +33,15 @@ K9PortageMasks::K9PortageMasks()
 
 void K9PortageMasks::loadAll(const QStringList& repos)
 {
-    QString s;
+    QString repo;
     QFileInfo fi;
-    QDir dir;
-    dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
-    foreach(QString repo, repos)
+    const int repoCount = repos.count();
+    for(int i = 0; i < repoCount; i++)
     {
-        s = QString("%1profiles/package.mask").arg(repo);
-        readMaskFile(s);
-
-        s = QString("%1profiles/package.unmask").arg(repo);
-        readMaskFile(s, true /* unmask */);
-
-        s = QString("%1profiles/package.accept_keywords").arg(repo);
-        readAcceptKeywordsFile(s);
+        repo = repos.at(i);
+        readMaskFile(QString("%1profiles/package.mask").arg(repo));
+        readMaskFile(QString("%1profiles/package.unmask").arg(repo), true /* unmask */);
+        readAcceptKeywordsFile(QString("%1profiles/package.accept_keywords").arg(repo));
     }
 
     fi.setFile("/etc/portage/make.profile");
@@ -108,22 +103,22 @@ void K9PortageMasks::readProfileFolder(QString profileFolder)
 
     readMaskFile(QString("%1/package.mask").arg(profileFolder));
 
+    int i;
     QString s = QString("%1/parent").arg(profileFolder);
     QFileInfo fi;
-    fi.setFile(s);
-    if(fi.isFile())
+    QFile input;
+    input.setFileName(s);
+    if(input.exists())
     {
-        QFile input;
-        input.setFileName(s);
         if(input.open(QIODevice::ReadOnly | QIODevice::Text))
         {
-            QString wholeFile = input.readAll();
+            s = input.readAll();
             input.close();
-            QStringList lines = wholeFile.split('\n');
-            foreach(QString parent, lines)
+            QStringList lines = s.split('\n');
+            const int lineCount = lines.count();
+            for(i = 0; i < lineCount; i++)
             {
-                parent = QString("%1/%2").arg(profileFolder, parent);
-                fi.setFile(parent);
+                fi.setFile(QString("%1/%2").arg(profileFolder, lines.at(i)));
                 if(fi.isDir())
                 {
                     readProfileFolder(fi.canonicalFilePath());
@@ -137,6 +132,8 @@ void K9PortageMasks::readProfileFolder(QString profileFolder)
 // for DEPEND atom syntax
 void K9PortageMasks::readMaskFile(QString fileName, bool unmask)
 {
+    QString s;
+    int i;
     QFileInfo fi;
     fi.setFile(fileName);
     if(fi.isDir())
@@ -144,9 +141,12 @@ void K9PortageMasks::readMaskFile(QString fileName, bool unmask)
         QDir dir;
         dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
         dir.setPath(fi.absoluteFilePath());
-        foreach(QString maskFile, dir.entryList())
+
+        QStringList files = dir.entryList();
+        const int fileCount = files.count();
+        for(i = 0; i < fileCount; i++)
         {
-            readMaskFile(QString("%1/%2").arg(dir.path(), maskFile), unmask);
+            readMaskFile(QString("%1/%2").arg(dir.path(), files.at(i)), unmask);
         }
         return;
     }
@@ -163,28 +163,17 @@ void K9PortageMasks::readMaskFile(QString fileName, bool unmask)
         return;
     }
 
-    QString wholeFile = input.readAll();
+    s = input.readAll();
     input.close();
-    QStringList lines = wholeFile.split('\n');
-//    QString comment;
-    QString s;
     QRegularExpressionMatch match;
-    foreach(s, lines)
-    {
-        s = s.trimmed();
-        if(s.isEmpty())
-        {
-//            comment.clear();
-            continue;
-        }
 
-        if(s.startsWith('#'))
+    QStringList lines = s.split('\n');
+    const int lineCount = lines.count();
+    for(int line = 0; line < lineCount; line++)
+    {
+        s = lines.at(line).trimmed();
+        if(s.isEmpty() || s.startsWith('#'))
         {
-/*            if(comment.isEmpty() == false)
-            {
-                comment.append("\n");
-            }
-            comment.append(s.mid(1).trimmed());*/
             continue;
         }
 
@@ -245,15 +234,18 @@ void K9PortageMasks::readMaskFile(QString fileName, bool unmask)
 void K9PortageMasks::readAcceptKeywordsFile(QString fileName)
 {
     QFileInfo fi;
+    int i;
     fi.setFile(fileName);
     if(fi.isDir())
     {
         QDir dir;
         dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
         dir.setPath(fi.absoluteFilePath());
-        foreach(QString maskFile, dir.entryList())
+        QStringList files = dir.entryList();
+        const int fileCount = files.count();
+        for(i = 0; i < fileCount; i++)
         {
-            readAcceptKeywordsFile(QString("%1/%2").arg(dir.path(), maskFile));
+            readAcceptKeywordsFile(QString("%1/%2").arg(dir.path(), files.at(i)));
         }
         return;
     }
@@ -270,36 +262,24 @@ void K9PortageMasks::readAcceptKeywordsFile(QString fileName)
         return;
     }
 
-    QString wholeFile = input.readAll();
+    QString s = input.readAll();
     input.close();
-    QStringList lines = wholeFile.split('\n');
-//    QString comment;
-    QString s;
+    QStringList lines = s.split('\n');
     QString allow;
     QRegularExpressionMatch match;
-    foreach(s, lines)
+    const int lineCount = lines.count();
+    for(int line = 0; line < lineCount; line++)
     {
-        s = s.trimmed();
-        if(s.isEmpty())
+        s = lines.at(line).trimmed();
+        if(s.isEmpty() || s.startsWith('#'))
         {
-//            comment.clear();
-            continue;
-        }
-
-        if(s.startsWith('#'))
-        {
-/*            if(comment.isEmpty() == false)
-            {
-                comment.append("\n");
-            }
-            comment.append(s.mid(1).trimmed());*/
             continue;
         }
 
         if(s.startsWith('-'))
         {
             s = s.mid(1);
-            int i = masks.indexOf(s);
+            i = masks.indexOf(s);
             if(i != -1)
             {
                 masks.removeAt(i);
@@ -307,7 +287,7 @@ void K9PortageMasks::readAcceptKeywordsFile(QString fileName)
             continue;
         }
 
-        int i = s.indexOf(' ');
+        i = s.indexOf(' ');
         if(i < 0)
         {
             allow = QString("~%1").arg(portage->arch);
@@ -333,6 +313,8 @@ void K9PortageMasks::readAcceptKeywordsFile(QString fileName)
 
 K9PortageMasks::maskType K9PortageMasks::isMasked(const QString& checkCategory, const QString& checkPackage, const QString& checkSlot, const QString& checkSubslot, const VersionString& checkVersion, const QString& keywords) const
 {
+    int i, j, k;
+
     maskType maskResult = notMasked;
     QString atom = QString("%1/%2").arg(checkCategory, checkPackage);
     QString atomVersion = atom;
@@ -343,9 +325,10 @@ K9PortageMasks::maskType K9PortageMasks::isMasked(const QString& checkCategory, 
     }
     else
     {
-        foreach(K9ComplexMask k, masksComplex)
+        const int masksComplexCount = masksComplex.count();
+        for(i = 0; i < masksComplexCount; i++)
         {
-            if(k.isMatch(checkCategory, checkPackage, checkSlot, checkSubslot, checkVersion))
+            if(masksComplex.at(i).isMatch(checkCategory, checkPackage, checkSlot, checkSubslot, checkVersion))
             {
                 maskResult = hardMask;
             }
@@ -360,9 +343,10 @@ K9PortageMasks::maskType K9PortageMasks::isMasked(const QString& checkCategory, 
         }
         else
         {
-            foreach(K9ComplexMask k, unmasksComplex)
+            const int unmasksComplexCount = unmasksComplex.count();
+            for(i = 0; i < unmasksComplexCount; i++)
             {
-                if(k.isMatch(checkCategory, checkPackage, checkSlot, checkSubslot, checkVersion))
+                if(unmasksComplex.at(i).isMatch(checkCategory, checkPackage, checkSlot, checkSubslot, checkVersion))
                 {
                     maskResult = notMasked;
                 }
@@ -377,14 +361,16 @@ K9PortageMasks::maskType K9PortageMasks::isMasked(const QString& checkCategory, 
         return maskResult;
     }
 
-    int i;
     QString s;
-    for(i = 0; i < acceptKeywords.count(); i++)
+    int allowedCount;
+    const int keywordCount = keywordList.count();
+    const int acceptKeywordCount = acceptKeywords.count();
+    for(i = 0; i < acceptKeywordCount; i++)
     {
         i = acceptKeywords.indexOf(atom, i);
         if(i == -1)
         {
-            // couldn't find atom in either simple acceptKeywords lists, try the complex list instead.
+            // couldn't find atom in simple acceptKeywords list, try the complex list instead.
             break;
         }
 
@@ -400,8 +386,10 @@ K9PortageMasks::maskType K9PortageMasks::isMasked(const QString& checkCategory, 
         }
 
         QStringList allowed = s.split(' ', Qt::SkipEmptyParts);
-        foreach(s, allowed)
+        allowedCount = allowed.count();
+        for(k = 0; k < allowedCount; k++)
         {
+            s = allowed.at(k);
             if(s == "**")
             {
                 // Package is always visible (KEYWORDS are ignored completely)
@@ -411,8 +399,9 @@ K9PortageMasks::maskType K9PortageMasks::isMasked(const QString& checkCategory, 
             if(s == "*")
             {
                 // Package is visible if it is stable on any architecture.
-                foreach(s, keywordList)
+                for(j = 0; j < keywordCount; j++)
                 {
+                    s = keywordList.at(j);
                     if(s.isEmpty() == false && s.startsWith("~") == false && s.startsWith("-") == false)
                     {
                         return maskResult;
@@ -422,9 +411,9 @@ K9PortageMasks::maskType K9PortageMasks::isMasked(const QString& checkCategory, 
             else if(s == "~*")
             {
                 // Package is visible if it is in testing on any architecture.
-                foreach(s, keywordList)
+                for(j = 0; j < keywordCount; j++)
                 {
-                    if(s.isEmpty() == false && s.startsWith("-") == false && s.startsWith("~") == true)
+                    if(keywordList.at(j).startsWith("~") == true)
                     {
                         return maskResult;
                     }
@@ -441,17 +430,19 @@ K9PortageMasks::maskType K9PortageMasks::isMasked(const QString& checkCategory, 
         }
     }
 
+    QStringList allowed;
     for(i = 0; i < acceptKeywordsComplex.count(); i++)
     {
-        K9ComplexMask k = acceptKeywordsComplex.at(i);
-        if(k.isMatch(checkCategory, checkPackage, checkSlot, checkSubslot, checkVersion) == false)
+        if(acceptKeywordsComplex.at(i).isMatch(checkCategory, checkPackage, checkSlot, checkSubslot, checkVersion) == false)
         {
             continue;
         }
 
-        QStringList allowed = acceptKeywordsComplexAllowed.at(i).split(' ');
-        foreach(s, allowed)
+        allowed = acceptKeywordsComplexAllowed.at(i).split(' ');
+        allowedCount = allowed.count();
+        for(k = 0; k < allowedCount; k++)
         {
+            s = allowed.at(k);
             if(s == "**")
             {
                 // Package is always visible (KEYWORDS are ignored completely)
@@ -461,8 +452,9 @@ K9PortageMasks::maskType K9PortageMasks::isMasked(const QString& checkCategory, 
             if(s == "*")
             {
                 // Package is visible if it is stable on any architecture.
-                foreach(s, keywordList)
+                for(j = 0; j < keywordCount; j++)
                 {
+                    s = keywordList.at(j);
                     if(s.isEmpty() == false && s.startsWith("~") == false && s.startsWith("-") == false)
                     {
                         return maskResult;
@@ -472,8 +464,9 @@ K9PortageMasks::maskType K9PortageMasks::isMasked(const QString& checkCategory, 
             else if(s == "~*")
             {
                 // Package is visible if it is in testing on any architecture.
-                foreach(s, keywordList)
+                for(j = 0; j < keywordCount; j++)
                 {
+                    s = keywordList.at(j);
                     if(s.isEmpty() == false && s.startsWith("-") == false && s.startsWith("~") == true)
                     {
                         return maskResult;

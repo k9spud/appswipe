@@ -24,23 +24,22 @@
 #include <QStringList>
 
 class QSqlQuery;
-class RescanThread : public QThread
+class ImportVDB
 {
-    Q_OBJECT
 public:
-    explicit RescanThread(QObject *parent = nullptr);
+    explicit ImportVDB();
     bool abort;
 
-    void rescan();
     void reloadDatabase(void);
-    void reloadApp(QString atom);
+    void reloadApp(QStringList appsList);
 
     bool importInstalledPackage(QSqlQuery* insertQuery, QString category, QString packagePath);
     bool importRepoPackage(QSqlQuery* insertQuery, QString category, QString packageName, QString buildsPath, QString ebuildFilePath);
     bool importMetaCache(QSqlQuery* insertQuery, QString category, QString packageName, QString metaCacheFilePath, QString version);
 
+    int loadCategories(QStringList& categories, const QString folder);
+    
 protected:
-    void run() override;
 };
 
 #endif // RESCANTHREAD_H

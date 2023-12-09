@@ -21,7 +21,7 @@
 
 bool showProgress = false;
 K9Portage* portage = nullptr;
-RescanThread* rescan = nullptr;
+ImportVDB* rescan = nullptr;
 QTextStream output(stdout);
 QTextStream error(stderr);
 

@@ -34,23 +34,35 @@
 #include <QStringList>
 #include <QVariant>
 
-RescanThread::RescanThread(QObject *parent) : QThread(parent)
+ImportVDB::ImportVDB()
 {
 }
 
-void RescanThread::rescan()
+int ImportVDB::loadCategories(QStringList& categories, const QString folder)
 {
-    if(isRunning())
+    QDir dir;
+    int folderCount = 0;
+    int i;
+
+    dir.setPath(folder);
+    dir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
+    QStringList folders = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    QString s;
+    const int foldersCount = folders.count();
+    for(i = 0; i < foldersCount; i++)
     {
-        abort = true;
-        wait();
+        folderCount++;
+        s = folders.at(i);
+        if(categories.contains(s) == false)
+        {
+            categories.append(s);
+        }
     }
 
-    abort = false;
-    start();
+    return folderCount;
 }
 
-void RescanThread::reloadDatabase()
+void ImportVDB::reloadDatabase()
 {
     QSqlDatabase db;
     if(QSqlDatabase::contains("RescanThread") == false)
@@ -80,15 +92,19 @@ void RescanThread::reloadDatabase()
     }
 
     QString repo;
+    QString s;
+    QStringList paths;
+    int i;
     query.prepare("insert into REPO (REPOID, REPO, LOCATION) values(?, ?, ?)");
-    for(int i = 0; i < portage->repos.count(); i++)
+    const int repoCount = portage->repos.count();
+    for(i = 0; i < repoCount; i++)
     {
         query.bindValue(0, i);
-        QString folder = portage->repos.at(i);
-        QStringList paths = folder.split('/');
+        s = portage->repos.at(i);
+        paths = s.split('/');
         repo = paths.at(paths.count() - 2);
         query.bindValue(1, repo);
-        query.bindValue(2, folder);
+        query.bindValue(2, s);
 
         if(query.exec() == false)
         {
@@ -100,30 +116,11 @@ void RescanThread::reloadDatabase()
     QStringList categories;
     int folderCount = 0, progressCount = 0;
     QDir dir;
-    foreach(QString repo, portage->repos)
+    for(i = 0; i < repoCount; i++)
     {
-        dir.setPath(repo);
-        dir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
-        foreach(QString cat, dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot))
-        {
-            folderCount++;
-            if(categories.contains(cat) == false)
-            {
-                categories.append(cat);
-            }
-        }
+        folderCount += loadCategories(categories, portage->repos.at(i));
     }
-
-    dir.setPath("/var/db/pkg/");
-    dir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
-    foreach(QString cat, dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot))
-    {
-        folderCount++;
-        if(categories.contains(cat) == false)
-        {
-            categories.append(cat);
-        }
-    }
+    folderCount += loadCategories(categories, "/var/db/pkg/");
 
     if(query.exec("delete from CATEGORY") == false)
     {
@@ -132,7 +129,8 @@ void RescanThread::reloadDatabase()
     }
 
     query.prepare("insert into CATEGORY (CATEGORYID, CATEGORY) values(?, ?)");
-    for(int i = 0; i < categories.count(); i++)
+    const int categoryCount = categories.count();
+    for(i = 0; i < categoryCount; i++)
     {
         query.bindValue(0, i);
         query.bindValue(1, categories.at(i));
@@ -157,6 +155,10 @@ void RescanThread::reloadDatabase()
     QString metaCacheFilePath;
     QFileInfo fi;
     QDir builds;
+    QStringList packageFolders;
+    QStringList ebuildFiles;
+    int folder;
+    int categoryId;
 
     query.prepare(R"EOF(
 insert into PACKAGE
@@ -172,10 +174,10 @@ values
     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 )
 )EOF");
-    for(int repoId = 0; repoId < portage->repos.count(); repoId++)
+    for(int repoId = 0; repoId < repoCount; repoId++)
     {
         output << QString("Loading %1").arg(portage->repos.at(repoId)) << Qt::endl;
-        for(int categoryId = 0; categoryId < categories.count(); categoryId++)
+        for(categoryId = 0; categoryId < categoryCount; categoryId++)
         {
             if(abort)
             {
@@ -190,14 +192,19 @@ values
             {
                 continue;
             }
-
-            foreach(packageName, dir.entryList(QDir::AllDirs | QDir::NoDotAndDotDot))
+            packageFolders = dir.entryList(QDir::AllDirs | QDir::NoDotAndDotDot);
+            const int packageFolderCount = packageFolders.count();
+            for(folder = 0; folder < packageFolderCount; folder++)
             {
+                packageName = packageFolders.at(folder);
                 buildsPath = QString("%1/%2").arg(categoryPath, packageName);
                 builds.setPath(buildsPath);
                 builds.setNameFilters(QStringList("*.ebuild"));
-                foreach(ebuildFilePath, builds.entryList(QDir::Files))
+                ebuildFiles = builds.entryList(QDir::Files);
+                const int ebuildCount = ebuildFiles.count();
+                for(i = 0; i < ebuildCount; i++)
                 {
+                    ebuildFilePath = ebuildFiles.at(i);
                     query.bindValue(0, categoryId);
                     query.bindValue(1, repoId);
 
@@ -228,10 +235,8 @@ values
         }
     }
 
-    QString package;
-
     output << "Loading /var/db/pkg/" << Qt::endl;
-    for(int categoryId = 0; categoryId < categories.count(); categoryId++)
+    for(categoryId = 0; categoryId < categories.count(); categoryId++)
     {
         if(abort)
         {
@@ -246,10 +251,13 @@ values
             continue;
         }
 
-        foreach(package, dir.entryList(QDir::AllDirs | QDir::NoDotAndDotDot))
+        packageFolders = dir.entryList(QDir::AllDirs | QDir::NoDotAndDotDot);
+        const int packageFolderCount = packageFolders.count();
+        for(i = 0; i < packageFolderCount; i++)
         {
+            packageName = packageFolders.at(i);
             query.bindValue(0, categoryId);
-            if(importInstalledPackage(&query, category, package) == false)
+            if(importInstalledPackage(&query, category, packageName) == false)
             {
                 output << "Query failed:" << query.executedQuery() << query.lastError().text() << Qt::endl;
                 db.rollback();
@@ -264,7 +272,7 @@ values
     output << "Done." << Qt::endl;
 }
 
-void RescanThread::reloadApp(QString atom)
+void ImportVDB::reloadApp(QStringList appsList)
 {
     QSqlDatabase db;
     if(QSqlDatabase::contains("RescanThread") == false)
@@ -288,28 +296,38 @@ void RescanThread::reloadApp(QString atom)
     db.transaction();
 
     query.prepare("delete from PACKAGE where CATEGORYID=(select CATEGORYID from CATEGORY where CATEGORY=?) and PACKAGE=?");
-    QStringList x = atom.split('/');
-    query.bindValue(0, x.first());
-    query.bindValue(1, x.last());
-
-    if(query.exec() == false)
-    {
-        db.rollback();
-        return;
-    }
-    progress(1);
-
-    QString category = x.first();
+    int i, repoId, file;
+    QStringList sl;
     QString categoryPath;
     QString buildsPath;
     QString ebuildFilePath;
     QString metaCacheFilePath;
+    QString category;
+    QString packageName;
     QFileInfo fi;
     QDir builds;
-    QString packageName = x.last();
+    QStringList ebuildFiles;
+
+    const int appsCount = appsList.count();
+    for(i = 0; i < appsCount; i++)
+    {
+        sl = appsList.at(i).split('/');
+        category = sl.first();
+        packageName = sl.last();
+
+        query.bindValue(0, category);
+        query.bindValue(1, packageName);
+        if(query.exec() == false)
+        {
+            db.rollback();
+            return;
+        }
+    }
+
+    progress(1);
     int progressCount = 2;
 
-    query.prepare(R"EOF(
+    query.prepare(QStringLiteral(R"EOF(
 insert into PACKAGE
 (
     CATEGORYID, REPOID, PACKAGE, DESCRIPTION, HOMEPAGE, VERSION, SLOT, LICENSE, INSTALLED, OBSOLETED,
@@ -322,35 +340,72 @@ values
     ?, ?, ?, ?, ?, ?, ?,
     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 )
-)EOF");
-    for(int repoId = 0; repoId < portage->repos.count(); repoId++)
-    {
-        categoryPath = portage->repos.at(repoId);
-        categoryPath.append(category);
+)EOF"));
 
-        buildsPath = QString("%1/%2").arg(categoryPath, packageName);
-        builds.setPath(buildsPath);
-        builds.setNameFilters(QStringList("*.ebuild"));
-        foreach(ebuildFilePath, builds.entryList(QDir::Files))
+    const int repoCount = portage->repos.count();
+    for(i = 0; i < appsCount; i++)
+    {
+        sl = appsList.at(i).split('/');
+        category = sl.first();
+        packageName = sl.last();
+        query.bindValue(0, category);
+
+        for(repoId = 0; repoId < repoCount; repoId++)
         {
-            query.bindValue(0, category);
             query.bindValue(1, repoId);
 
-            metaCacheFilePath = QString("%1metadata/md5-cache/%2/%3").arg(portage->repos.at(repoId), category, ebuildFilePath.left(ebuildFilePath.length() - 7));
-            fi.setFile(metaCacheFilePath);
-            if(fi.exists())
-            {
-                fi.setFile(buildsPath + "/" + ebuildFilePath);
-                query.bindValue(14, fi.birthTime().toSecsSinceEpoch()); /* published */
+            categoryPath = portage->repos.at(repoId);
+            categoryPath.append(category);
 
-                if(importMetaCache(&query, category, packageName, metaCacheFilePath, ebuildFilePath.mid(packageName.length() + 1, ebuildFilePath.length() - (7 + packageName.length() + 1))) == false)
+            buildsPath = QString("%1/%2").arg(categoryPath, packageName);
+            builds.setPath(buildsPath);
+            builds.setNameFilters(QStringList("*.ebuild"));
+            ebuildFiles = builds.entryList(QDir::Files);
+            const int ebuildCount = ebuildFiles.count();
+            for(file = 0; file < ebuildCount; file++)
+            {
+                ebuildFilePath = ebuildFiles.at(file);
+
+                metaCacheFilePath = QString("%1metadata/md5-cache/%2/%3").arg(portage->repos.at(repoId), category, ebuildFilePath.left(ebuildFilePath.length() - 7));
+                fi.setFile(metaCacheFilePath);
+                if(fi.exists())
+                {
+                    fi.setFile(buildsPath + "/" + ebuildFilePath);
+                    query.bindValue(14, fi.birthTime().toSecsSinceEpoch()); /* published */
+
+                    if(importMetaCache(&query, category, packageName, metaCacheFilePath, ebuildFilePath.mid(packageName.length() + 1, ebuildFilePath.length() - (7 + packageName.length() + 1))) == false)
+                    {
+                        output << "Query failed:" << query.executedQuery() << query.lastError().text() << Qt::endl;
+                        db.rollback();
+                        return;
+                    }
+                }
+                else if(importRepoPackage(&query, category, packageName, buildsPath, ebuildFilePath) == false)
                 {
                     output << "Query failed:" << query.executedQuery() << query.lastError().text() << Qt::endl;
                     db.rollback();
                     return;
                 }
+                progress(progressCount++);
             }
-            else if(importRepoPackage(&query, category, packageName, buildsPath, ebuildFilePath) == false)
+        }
+
+        QString package;
+
+        QStringList packageNameFilter;
+        packageNameFilter << QString("%1-*").arg(packageName);
+
+        QDir dir;
+        categoryPath = QString("/var/db/pkg/%1/").arg(category);
+        dir.setPath(categoryPath);
+        query.bindValue(0, category);
+
+        ebuildFiles = dir.entryList(packageNameFilter, QDir::Dirs | QDir::NoDotAndDotDot);
+        const int ebuildCount = ebuildFiles.count();
+        for(file = 0; file < ebuildCount; file++)
+        {
+            package = ebuildFiles.at(file);
+            if(importInstalledPackage(&query, category, package) == false)
             {
                 output << "Query failed:" << query.executedQuery() << query.lastError().text() << Qt::endl;
                 db.rollback();
@@ -360,31 +415,11 @@ values
         }
     }
 
-    QString package;
-
-    QStringList packageNameFilter;
-    packageNameFilter << QString("%1-*").arg(packageName);
-
-    QDir dir;
-    categoryPath = QString("/var/db/pkg/%1/").arg(category);
-    dir.setPath(categoryPath);
-    foreach(package, dir.entryList(packageNameFilter, QDir::Dirs | QDir::NoDotAndDotDot))
-    {
-        query.bindValue(0, category);
-        if(importInstalledPackage(&query, category, package) == false)
-        {
-            output << "Query failed:" << query.executedQuery() << query.lastError().text() << Qt::endl;
-            db.rollback();
-            return;
-        }
-        progress(progressCount++);
-    }
-
     db.commit();
     progress(100);
 }
 
-bool RescanThread::importInstalledPackage(QSqlQuery* query, QString category, QString package)
+bool ImportVDB::importInstalledPackage(QSqlQuery* query, QString category, QString package)
 {
     QRegularExpressionMatch match;
     QRegularExpression pvsplit;
@@ -621,7 +656,7 @@ bool RescanThread::importInstalledPackage(QSqlQuery* query, QString category, QS
     return true;
 }
 
-bool RescanThread::importRepoPackage(QSqlQuery* query, QString category, QString packageName, QString buildsPath, QString ebuildFilePath)
+bool ImportVDB::importRepoPackage(QSqlQuery* query, QString category, QString packageName, QString buildsPath, QString ebuildFilePath)
 {
     QRegularExpressionMatch match;
     QRegularExpression pvsplit;
@@ -731,7 +766,7 @@ bool RescanThread::importRepoPackage(QSqlQuery* query, QString category, QString
     return true;
 }
 
-bool RescanThread::importMetaCache(QSqlQuery* query, QString category, QString packageName, QString metaCacheFilePath, QString version)
+bool ImportVDB::importMetaCache(QSqlQuery* query, QString category, QString packageName, QString metaCacheFilePath, QString version)
 {
     QRegularExpressionMatch match;
     QRegularExpression pvsplit;
@@ -836,8 +871,3 @@ bool RescanThread::importMetaCache(QSqlQuery* query, QString category, QString p
     return true;
 }
 
-void RescanThread::run()
-{
-    reloadDatabase();
-    output << "Rescan thread finished." << Qt::endl;
-}

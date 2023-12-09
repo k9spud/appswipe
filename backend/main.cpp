@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
     bool synced = false;
     bool reload = false;
     qint64 pid = -1;
-    QStringList atoms;
+    QStringList appList;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
         {
             while(++i < argc)
             {
-                atoms << argv[i];
+                appList << argv[i];
                 emerged = true;
             }
             break;
@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
         {
             while(++i < argc)
             {
-                atoms << argv[i];
+                appList << argv[i];
                 reload = true;
             }
             break;
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
     {
         if(rescan == nullptr)
         {
-            rescan = new RescanThread(nullptr);
+            rescan = new ImportVDB();
         }
 
         output << APP_NAME << " v" << APP_VERSION << Qt::endl;
@@ -118,18 +118,12 @@ int main(int argc, char *argv[])
     {
         if(emerged)
         {
-            foreach(QString s, atoms)
-            {
-                portage->emergedApp(s);
-            }
+            portage->emergedApp(appList);
         }
 
         if(reload)
         {
-            foreach(QString s, atoms)
-            {
-                rescan->reloadApp(s);
-            }
+            rescan->reloadApp(appList);
         }
     }
 

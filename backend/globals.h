@@ -22,7 +22,7 @@
 
 extern bool showProgress;
 extern class K9Portage* portage;
-extern class RescanThread* rescan;
+extern class ImportVDB* rescan;
 extern QTextStream output;
 extern QTextStream error;
 

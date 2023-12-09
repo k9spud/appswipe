@@ -66,7 +66,7 @@ public:
     QRegularExpression dependKeywordsSlotRE;
     QRegularExpression dependKeywordsRepositoryRE;
 
-    void emergedApp(QString app);
+    void emergedApp(QStringList appList);
 
     enum PackageStatus
     {
