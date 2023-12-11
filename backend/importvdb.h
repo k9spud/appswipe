@@ -17,20 +17,27 @@
 #ifndef IMPORTVDB_H
 #define IMPORTVDB_H
 
-#include <QThread>
-#include <QHash>
-#include <QVariant>
-#include <QRegularExpression>
-#include <QStringList>
+#include "k9atomlist.h"
 
-extern class ImportVDB* rescan;
+#include <QStringList>
 
 class QSqlQuery;
 class ImportVDB
 {
 public:
-    explicit ImportVDB();
+    ImportVDB();
     bool abort;
+
+    QStringList atoms; // allows for looking up atomId given a full atom filter string
+    K9AtomList atomList; // allows for looking up parsed K9Atom objects and their configuration, using full atom filter matching
+    QHash<QString, QString> makeConf; // contains /etc/portage/make.conf style environment variable settings
+
+    void loadConfig(void);
+    void readMakeConf(QString filePath);
+    int readConfigFolder(QString fileFolder);
+    int readProfileFolder(QString profileFolder);
+    int readConfigFile(QString fileFolder, QString fileName, K9AtomAction::AtomActionType actionType);
+    void applyConfigMasks(K9Atom::maskType& masked, QString category, QString package, QString slot, QString subslot, QStringList keywordList);
 
     void reloadDatabase(void);
     void reloadApp(QStringList appsList);
@@ -40,8 +47,11 @@ public:
     bool importMetaCache(QSqlQuery* insertQuery, QString category, QString packageName, QString metaCacheFilePath, QString version);
 
     int loadCategories(QStringList& categories, const QString folder);
-    
+
 protected:
+
+private:
+    QStringList profileFolders; // used to keep track of which profile folders we've already loaded so we don't get into an infinite loop
 };
 
 #endif // IMPORTVDB_H

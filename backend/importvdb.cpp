@@ -17,8 +17,8 @@
 #include "importvdb.h"
 #include "datastorage.h"
 #include "k9portage.h"
-#include "k9portagemasks.h"
 #include "globals.h"
+#include "importvdb.h"
 #include "versionstring.h"
 
 #include <QDebug>
@@ -33,8 +33,6 @@
 #include <QRegularExpression>
 #include <QStringList>
 #include <QVariant>
-
-ImportVDB* rescan = nullptr;
 
 ImportVDB::ImportVDB()
 {
@@ -238,7 +236,7 @@ values
     }
 
     output << "Loading /var/db/pkg/" << Qt::endl;
-    for(categoryId = 0; categoryId < categories.count(); categoryId++)
+    for(categoryId = 0; categoryId < categoryCount; categoryId++)
     {
         if(abort)
         {
@@ -421,6 +419,500 @@ values
     progress(100);
 }
 
+int ImportVDB::readConfigFolder(/*QSqlQuery& query,*/ QString fileFolder)
+{
+    readMakeConf(QString("%1/make.defaults").arg(fileFolder));
+
+    int result;
+    result = readConfigFile(fileFolder, QStringLiteral("package.accept_keywords"), K9AtomAction::packageAcceptKeywords);
+    if(result)
+    {
+        return result;
+    }
+
+/*
+    result = readConfigFile(fileFolder, QStringLiteral("package.keywords"), K9AtomAction::packageKeywords);
+    if(result)
+    {
+        return result;
+    }
+*/
+
+    result = readConfigFile(fileFolder, QStringLiteral("package.mask"), K9AtomAction::packageMask);
+    if(result)
+    {
+        return result;
+    }
+/*
+    result = readConfigFile(fileFolder, QStringLiteral("package.provided"), K9AtomAction::packageProvided);
+    if(result)
+    {
+        return result;
+    }
+*/
+    result = readConfigFile(fileFolder, QStringLiteral("package.unmask"), K9AtomAction::packageUnmask);
+    if(result)
+    {
+        return result;
+    }
+/*
+    result = readConfigFile(fileFolder, QStringLiteral("package.use"), K9AtomAction::packageUse);
+    if(result)
+    {
+        return result;
+    }
+
+    result = readConfigFile(fileFolder, QStringLiteral("package.use.force"), K9AtomAction::packageUseForce);
+    if(result)
+    {
+        return result;
+    }
+
+    result = readConfigFile(fileFolder, QStringLiteral("package.use.mask"), K9AtomAction::packageUseMask);
+    if(result)
+    {
+        return result;
+    }
+
+    result = readConfigFile(fileFolder, QStringLiteral("package.use.stable.force"), K9AtomAction::packageUseStableForce);
+    if(result)
+    {
+        return result;
+    }
+
+    result = readConfigFile(fileFolder, QStringLiteral("package.use.stable.mask"), K9AtomAction::packageUseStableMask);
+    if(result)
+    {
+        return result;
+    }
+
+    result = readConfigFile(fileFolder, QStringLiteral("use.force"), K9AtomAction::useForce);
+    if(result)
+    {
+        return result;
+    }
+
+    result = readConfigFile(fileFolder, QStringLiteral("use.mask"), K9AtomAction::useMask);
+    if(result)
+    {
+        return result;
+    }
+
+    result = readConfigFile(fileFolder, QStringLiteral("use.stable.mask"), K9AtomAction::useStableMask);
+    if(result)
+    {
+        return result;
+    }
+
+    result = readConfigFile(fileFolder, QStringLiteral("use.stable.force"), K9AtomAction::useStableForce);
+    if(result)
+    {
+        return result;
+    }
+*/
+    return 0;
+}
+
+int ImportVDB::readProfileFolder(QString profileFolder)
+{
+    int result;
+
+    if(profileFolders.contains(profileFolder))
+    {
+        // don't get stuck in an infinite loop of repeating profile folders
+        return 0;
+    }
+    profileFolders.append(profileFolder);
+
+    // read parent profiles first
+    QString s = QString("%1/parent").arg(profileFolder);
+    QFileInfo fi;
+    fi.setFile(s);
+    if(fi.isFile())
+    {
+        QFile input;
+        input.setFileName(s);
+        if(input.open(QIODevice::ReadOnly | QIODevice::Text))
+        {
+            QString wholeFile = input.readAll();
+            input.close();
+            QStringList lines = wholeFile.split('\n');
+            QString parent;
+            const int linesCount = lines.count();
+            for(int i = 0; i < linesCount; i++)
+            {
+                parent = QString("%1/%2").arg(profileFolder, lines.at(i));
+                fi.setFile(parent);
+                if(fi.isDir())
+                {
+                    result = readProfileFolder(fi.canonicalFilePath());
+                    if(result)
+                    {
+                        return result;
+                    }
+                }
+            }
+        }
+    }
+
+    result = readConfigFolder(profileFolder);
+    if(result)
+    {
+        return result;
+    }
+
+    return 0;
+}
+
+void ImportVDB::readMakeConf(QString filePath)
+{
+    QFile input;
+    input.setFileName(filePath);
+    QString varkey;
+    if(input.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        QStringList lines = static_cast<QString>(input.readAll()).split('\n');
+        input.close();
+
+        const int linesCount = lines.count();
+        QString s;
+        QString key;
+        QString value;
+        int i;
+        for(int j = 0; j < linesCount; j++)
+        {
+            s = lines.at(j).trimmed();
+            if(s.startsWith('#') || s.isEmpty())
+            {
+                continue;
+            }
+            i = s.indexOf('=');
+            if(i == -1)
+            {
+                continue;
+            }
+            key = s.left(i);
+            value = s.mid(i + 1);
+            if(value.startsWith('"'))
+            {
+                while(value.endsWith('"') == false && ++i < linesCount)
+                {
+                    s = lines.at(i);
+                    value.append(s);
+                }
+
+                if(value.endsWith('"'))
+                {
+                    value = value.mid(1, value.count() - 2);
+                }
+                else
+                {
+                    value = value.mid(1);
+                }
+            }
+
+            varkey = QString("${%1}").arg(key);
+            if(value.contains(varkey))
+            {
+                value.remove(varkey);
+            }
+
+            if(makeConf.contains(key))
+            {
+                value.prepend(' ');
+            }
+
+            makeConf[key].append(value);
+        }
+    }
+}
+
+void ImportVDB::loadConfig()
+{
+    QString s;
+    QFileInfo fi;
+    const int reposCount = portage->repos.count();
+    for(int i = 0; i < reposCount; i++)
+    {
+        s = QString("%1profiles").arg(portage->repos.at(i));
+        if(readConfigFolder(s))
+        {
+            return;
+        }
+    }
+
+    fi.setFile("/etc/portage/make.profile");
+    if(fi.isDir())
+    {
+        readProfileFolder(fi.canonicalFilePath());
+    }
+
+    s = QStringLiteral("/etc/portage");
+    if(readConfigFolder(s))
+    {
+        return;
+    }
+
+    readMakeConf("/etc/portage/make.conf");
+
+    profileFolders.clear();
+}
+
+int ImportVDB::readConfigFile(QString fileFolder, QString fileName, K9AtomAction::AtomActionType actionType)
+{
+    int result;
+    QString fileAndPath = QString("%1/%2").arg(fileFolder, fileName);
+    QFileInfo fi;
+    fi.setFile(fileAndPath);
+    if(fi.isDir())
+    {
+        QDir dir;
+        dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
+        dir.setPath(fi.absoluteFilePath());
+        foreach(QString file, dir.entryList())
+        {
+            result = readConfigFile(dir.path(), file, actionType);
+            if(result)
+            {
+                return result;
+            }
+        }
+        return 0;
+    }
+
+    if(fi.exists() == false || fi.isFile() == false)
+    {
+        return 0;
+    }
+
+    QFile input;
+    input.setFileName(fileAndPath);
+    if(!input.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        return 0;
+    }
+
+    const static QList<K9AtomAction::AtomActionType> anyPackageActionType = { K9AtomAction::useForce, K9AtomAction::useMask, K9AtomAction::useStableMask, K9AtomAction::useStableForce };
+    bool anyPackage = false;
+    if(anyPackageActionType.contains(actionType))
+    {
+        anyPackage = true;
+    }
+
+    QStringList lines = static_cast<QString>(input.readAll()).split('\n');
+    input.close();
+
+    QString atom;
+    QString action;
+    QString comment;
+    QString s;
+    int spaceIndex;
+    int atomId;
+    bool newComment = true;
+    bool negative;
+    const int linesCount = lines.count();
+    for(int i = 0; i < linesCount; i++)
+    {
+        s = lines.at(i).trimmed();
+        if(s.isEmpty())
+        {
+            newComment = true;
+            continue;
+        }
+
+        if(s.startsWith('#'))
+        {
+            if(newComment)
+            {
+                comment.clear();
+            }
+            else
+            {
+                comment.append("\n");
+            }
+            comment.append(s.mid(1).trimmed());
+            newComment = false;
+            continue;
+        }
+
+        if(s.startsWith('-'))
+        {
+            s = s.mid(1);
+            negative = true;
+        }
+        else
+        {
+            negative = false;
+        }
+
+        if(anyPackage)
+        {
+            atom = "*/*";
+            action = s;
+        }
+        else
+        {
+            spaceIndex = s.indexOf(' ');
+            if(spaceIndex > 0)
+            {
+                atom = s.left(spaceIndex);
+                action = s.mid(spaceIndex + 1).trimmed();
+            }
+            else
+            {
+                atom = s;
+                action.clear();
+            }
+        }
+
+        atomId = atoms.indexOf(atom);
+        if(atomId < 0)
+        {
+            if(negative)
+            {
+                // normally, a negative line should remove all prior matching lines.
+                // but if no prior matching atom, obviously there aren't any prior matching lines to remove
+                newComment = true;
+                continue;
+            }
+            atomId = atoms.count();
+            atoms.append(atom);
+            atomList.appendAtom(atomId, atom);
+        }
+
+        K9AtomAction a;
+        a.actionType = actionType;
+        a.action = action;
+        if(negative)
+        {
+            atomList.atomActions[atomId].removeAll(a);
+        }
+        else
+        {
+            atomList.appendAtomAction(atomId, a);
+        }
+
+        newComment = true;
+    }
+
+    return 0;
+}
+
+void ImportVDB::applyConfigMasks(K9Atom::maskType& masked, QString category, QString package, QString slot, QString subslot, QStringList keywordList)
+{
+    QList<int> matchingAtomIds = atomList.findMatches(category, package, slot, subslot, portage->version);
+    const int matchingIdsCount = matchingAtomIds.count();
+    int atomId;
+    QStringList sl;
+    int i;
+
+    for(i = 0; i < matchingIdsCount; i++)
+    {
+        atomId = matchingAtomIds.at(i);
+
+        QList<K9AtomAction> actionList = atomList.atomActions.value(atomId);
+        const int actionListCount = actionList.count();
+        for(int k = 0; k < actionListCount; k++)
+        {
+            K9AtomAction action = actionList.at(k);
+            switch(action.actionType)
+            {
+                case K9AtomAction::packageAcceptKeywords:
+                    if(action.action.isEmpty())
+                    {
+                        // Lines without any accept_keywords imply unstable host arch.
+                        masked = static_cast<K9Atom::maskType>(masked & ~(K9Atom::testingMask));
+                    }
+                    else
+                    {
+                        QStringList allowed = action.action.split(' ', Qt::SkipEmptyParts);
+                        const int allowedCount = allowed.count();
+                        for(int i = 0; i < allowedCount; i++)
+                        {
+                            const QString& s = allowed.at(i);
+                            if(s == "**")
+                            {
+                                // Package is always visible (KEYWORDS are ignored completely)
+                                masked = static_cast<K9Atom::maskType>(masked & ~(K9Atom::testingMask) & ~(K9Atom::unsupportedMask) & ~(K9Atom::brokenMask));
+                            }
+                            else if(s == "*")
+                            {
+                                // Package is visible if it is stable on any architecture.
+                                QString s;
+                                foreach(s, keywordList)
+                                {
+                                    if(s.isEmpty() == false && s.startsWith("~") == false && s.startsWith("-") == false)
+                                    {
+                                        masked = static_cast<K9Atom::maskType>(masked & ~(K9Atom::testingMask) & ~(K9Atom::unsupportedMask) & ~(K9Atom::brokenMask));
+                                        break;
+                                    }
+                                }
+                            }
+                            else if(s == "~*")
+                            {
+                                // Package is visible if it is in testing on any architecture.
+                                QString s;
+                                foreach(s, keywordList)
+                                {
+                                    if(s.isEmpty() == false && s.startsWith("-") == false && s.startsWith("~") == true)
+                                    {
+                                        masked = static_cast<K9Atom::maskType>(masked & ~(K9Atom::testingMask) & ~(K9Atom::unsupportedMask) & ~(K9Atom::brokenMask));
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // Package is visible if keywords match package.accept_keywords
+                                if(keywordList.contains(s))
+                                {
+                                    masked = static_cast<K9Atom::maskType>(masked & ~(K9Atom::testingMask) & ~(K9Atom::unsupportedMask) & ~(K9Atom::brokenMask));
+                                }
+                            }
+                        }
+                    }
+                    break;
+
+/*                case K9AtomAction::packageKeywords:
+                    break;
+*/
+                case K9AtomAction::packageMask:
+                    masked = static_cast<K9Atom::maskType>(masked + K9Atom::hardMask);
+                    break;
+/*
+                case K9AtomAction::packageProvided:
+                    break;
+*/
+                case K9AtomAction::packageUnmask:
+                    masked = static_cast<K9Atom::maskType>(masked & ~(K9Atom::hardMask));
+                    break;
+/*
+                case K9AtomAction::packageUse:
+                    break;
+
+                case K9AtomAction::packageUseForce:
+                case K9AtomAction::useForce:
+                    break;
+
+                case K9AtomAction::packageUseMask:
+                case K9AtomAction::useMask:
+                    break;
+
+                case K9AtomAction::packageUseStableForce:
+                case K9AtomAction::useStableForce:
+                    break;
+
+                case K9AtomAction::packageUseStableMask:
+                case K9AtomAction::useStableMask:
+                    break;
+*/
+                case K9AtomAction::none:
+                default:
+                    break;
+            }
+        }
+    }
+}
+
 bool ImportVDB::importInstalledPackage(QSqlQuery* query, QString category, QString package)
 {
     QRegularExpressionMatch match;
@@ -562,18 +1054,27 @@ bool ImportVDB::importInstalledPackage(QSqlQuery* query, QString category, QStri
             keywords = data.trimmed();
         }
     }
+    K9Atom::maskType masked;
+    status = K9Portage::UNKNOWN;
+    masked = K9Atom::unsupportedMask;
+
     keywordList = keywords.split(' ');
+    if(keywordList.contains(QString("-%1").arg(portage->arch)) || keywordList.contains("-*"))
+    {
+        // package is broken for this architecture
+        status = K9Portage::UNKNOWN;
+        masked = K9Atom::brokenMask;
+    }
+
     if(keywordList.contains(portage->arch))
     {
         status = K9Portage::STABLE;
+        masked = K9Atom::notMasked;
     }
     else if(keywordList.contains(QString("~%1").arg(portage->arch)))
     {
         status = K9Portage::TESTING;
-    }
-    else
-    {
-        status = K9Portage::UNKNOWN;
+        masked = K9Atom::testingMask;
     }
 
     iuse = portage->var("IUSE").toString();
@@ -625,6 +1126,8 @@ bool ImportVDB::importInstalledPackage(QSqlQuery* query, QString category, QStri
         license = data.trimmed();
     }
 
+    applyConfigMasks(masked, category, packageName, slot, subslot, keywordList);
+
     query->bindValue(2, packageName);
     query->bindValue(3, description);
     query->bindValue(4, homepage);
@@ -636,7 +1139,7 @@ bool ImportVDB::importInstalledPackage(QSqlQuery* query, QString category, QStri
     query->bindValue(10, downloadSize);
     query->bindValue(11, keywords);
     query->bindValue(12, iuse);
-    query->bindValue(13, 0); /* not masked if installed */
+    query->bindValue(13, masked);
     query->bindValue(14, published);
     query->bindValue(15, status);
     query->bindValue(16, QVariant(subslot));
@@ -710,19 +1213,30 @@ bool ImportVDB::importRepoPackage(QSqlQuery* query, QString category, QString pa
     }
 
     keywords = portage->var("KEYWORDS").toString();
+    K9Atom::maskType masked;
+    status = K9Portage::UNKNOWN;
+    masked = K9Atom::unsupportedMask;
+
     keywordList = keywords.split(' ');
+    if(keywordList.contains(QString("-%1").arg(portage->arch)) || keywordList.contains("-*"))
+    {
+        // package is broken for this architecture
+        status = K9Portage::UNKNOWN;
+        masked = K9Atom::brokenMask;
+    }
+
     if(keywordList.contains(portage->arch))
     {
         status = K9Portage::STABLE;
+        masked = K9Atom::notMasked;
     }
     else if(keywordList.contains(QString("~%1").arg(portage->arch)))
     {
         status = K9Portage::TESTING;
+        masked = K9Atom::testingMask;
     }
-    else
-    {
-        status = K9Portage::UNKNOWN;
-    }
+
+
 
     slot = portage->var("SLOT").toString();
     if(slot.contains('/'))
@@ -735,6 +1249,9 @@ bool ImportVDB::importRepoPackage(QSqlQuery* query, QString category, QString pa
     {
         subslot.clear();
     }
+
+    applyConfigMasks(masked, category, packageName, slot, subslot, keywordList);
+
     query->bindValue(2, packageName);
     query->bindValue(3, portage->var("DESCRIPTION"));
     query->bindValue(4, portage->var("HOMEPAGE"));
@@ -746,7 +1263,7 @@ bool ImportVDB::importRepoPackage(QSqlQuery* query, QString category, QString pa
     query->bindValue(10, downloadSize);
     query->bindValue(11, keywords);
     query->bindValue(12, portage->var("IUSE"));
-    query->bindValue(13, portageMasks->isMasked(category, packageName, slot, subslot, portage->version, keywords)); /* default to not masked for now -- masks applied later as last step */
+    query->bindValue(13, masked);
     query->bindValue(14, published);
     query->bindValue(15, status);
     query->bindValue(16, QVariant(subslot));
@@ -816,18 +1333,28 @@ bool ImportVDB::importMetaCache(QSqlQuery* query, QString category, QString pack
     }
 
     keywords = portage->var("KEYWORDS").toString();
+
+    K9Atom::maskType masked;
+    status = K9Portage::UNKNOWN;
+    masked = K9Atom::unsupportedMask;
+
     keywordList = keywords.split(' ');
+    if(keywordList.contains(QString("-%1").arg(portage->arch)) || keywordList.contains("-*"))
+    {
+        // package is broken for this architecture
+        status = K9Portage::UNKNOWN;
+        masked = K9Atom::brokenMask;
+    }
+
     if(keywordList.contains(portage->arch))
     {
         status = K9Portage::STABLE;
+        masked = K9Atom::notMasked;
     }
     else if(keywordList.contains(QString("~%1").arg(portage->arch)))
     {
         status = K9Portage::TESTING;
-    }
-    else
-    {
-        status = K9Portage::UNKNOWN;
+        masked = K9Atom::testingMask;
     }
 
     slot = portage->var("SLOT").toString();
@@ -841,6 +1368,9 @@ bool ImportVDB::importMetaCache(QSqlQuery* query, QString category, QString pack
     {
         subslot.clear();
     }
+
+    applyConfigMasks(masked, category, packageName, slot, subslot, keywordList);
+
     query->bindValue(2, packageName);
     query->bindValue(3, portage->var("DESCRIPTION"));
     query->bindValue(4, portage->var("HOMEPAGE"));
@@ -852,7 +1382,7 @@ bool ImportVDB::importMetaCache(QSqlQuery* query, QString category, QString pack
     query->bindValue(10, downloadSize);
     query->bindValue(11, keywords);
     query->bindValue(12, portage->var("IUSE"));
-    query->bindValue(13, portageMasks->isMasked(category, packageName, slot, subslot, portage->version, keywords)); /* default to not masked for now -- masks applied later as last step */
+    query->bindValue(13, masked);
     query->bindValue(15, status);
     query->bindValue(16, QVariant(subslot));
     query->bindValue(17, portage->version.cutInternalVx(0));

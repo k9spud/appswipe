@@ -12,9 +12,10 @@ SOURCES += \
         datastorage.cpp \
         globals.cpp \
         importvdb.cpp \
-        k9complexmask.cpp \
+        k9atom.cpp \
+        k9atomaction.cpp \
+        k9atomlist.cpp \
         k9portage.cpp \
-        k9portagemasks.cpp \
         main.cpp \
         versionstring.cpp
 
@@ -27,9 +28,10 @@ HEADERS += \
     datastorage.h \
     globals.h \
     importvdb.h \
-    k9complexmask.h \
+    k9atom.h \
+    k9atomaction.h \
+    k9atomlist.h \
     k9portage.h \
-    k9portagemasks.h \
     main.h \
     versionstring.h
 
