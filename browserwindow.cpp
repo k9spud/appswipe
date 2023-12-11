@@ -500,7 +500,13 @@ void BrowserWindow::on_reloadButton_clicked()
         setWorking(true);
         CompositeView* view = ui->tabWidget->currentView();
         connect(view, SIGNAL(loadProgress(int)), ui->searchProgress, SLOT(setValue(int)));
-
+        view->setStatus("Reloading...");
+        connect(view->browser(), &BrowserView::loadFinished, this, &BrowserWindow::reloadAppComplete);
+        connect(view->browser(), &BrowserView::loadProgress, ui->searchProgress, &QProgressBar::setValue);
+        setWorking(true);
+        view->reload(true); // default to always hard reload now that it is fast enough
+        ui->lineEdit->setText(view->url());
+/*
         bool hardReload = QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ShiftModifier) ||
                           QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ControlModifier);
         if(hardReload)
@@ -517,7 +523,7 @@ void BrowserWindow::on_reloadButton_clicked()
             disconnect(view, SIGNAL(loadProgress(int)), ui->searchProgress, SLOT(setValue(int)));
             setWorking(false);
             ui->tabWidget->setTabIcon(ui->tabWidget->currentIndex(), view->icon());
-        }
+        }*/
     }
 }
 
