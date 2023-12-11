@@ -17,7 +17,6 @@
 #include "main.h"
 #include "globals.h"
 #include "k9portage.h"
-#include "k9portagemasks.h"
 #include "datastorage.h"
 #include "importvdb.h"
 
@@ -31,6 +30,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName(APP_NAME);
     QCoreApplication::setApplicationVersion(APP_VERSION);
     QCoreApplication a(argc, argv);
+    ImportVDB* rescan = nullptr;
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     if(env.contains("RET_CODE"))
@@ -45,9 +45,6 @@ int main(int argc, char *argv[])
 
     portage = new K9Portage();
     portage->setRepoFolder("/var/db/repos/");
-
-    portageMasks = new K9PortageMasks();
-    portageMasks->loadAll(portage->repos);
 
     ds = new DataStorage();
     ds->openDatabase();
@@ -112,6 +109,7 @@ int main(int argc, char *argv[])
 
         output << APP_NAME << " v" << APP_VERSION << Qt::endl;
         rescan->abort = false;
+        rescan->loadConfig();
         rescan->reloadDatabase();
     }
     else
@@ -123,6 +121,12 @@ int main(int argc, char *argv[])
 
         if(reload)
         {
+            if(rescan == nullptr)
+            {
+                rescan = new ImportVDB();
+            }
+            rescan->abort = false;
+            rescan->loadConfig();
             rescan->reloadApp(appList);
         }
     }
