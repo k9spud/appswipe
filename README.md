@@ -10,29 +10,25 @@ upgrading apps.
 
 ![Screenshot](https://github.com/k9spud/appswipe/assets/39664841/754e807d-4e57-457e-8d54-554d38e8a070)
 
-What's New in v1.1.66?
+What's New in v1.1.68?
 ======================
-Fixed bug introduced in v1.1.65 where installing/upgrading a non-@world 
-package would fail to use the --oneshot command line option for emerge.
-If you clicked to install any individual packages in v1.1.65,
-you probably had those packages added to @world. Sorry!
 
-Added code for text interaction lock-out during a page load. Now 
-that pages load partially in a separate process, it became possible
-to quickly click a link and have the remaining portion of the page load 
-inserted at that position rather than appending to the end. The text
-interaction lock-out should prevent such visual mistake from happening.
+With even more optimization, `Reload Database` should be slightly faster.
 
-When viewing an app that hasn't been installed at all on the system, App
-Swipe is supposed to display information about the best version of the 
-app. Prior releases failed to select the latest `testing` version when 
-there are no `stable` versions available. Instead, it was showing the 9999 
-live build. Fixed.
+Because database reloads are fairly fast now, there doesn't seem to be a 
+whole lot of reason to do a 'soft reload' when the user presses the Reload 
+button while viewing an app in the browser. Now the Reload button does a 
+'hard reload' regardless of whether CTRL or SHIFT is being held down.
+
+Fixed a bug where the backend process was trying to deference a nullptr
+when using the `-reload` command line option. This has probably prevented
+`hard reload` from working anyway (since v1.1.52, when the backend process 
+was implemented).
 
 Help Get the Word Out
 =====================
 
-If you like this program, help us reach more people by clicking the `Star`
+If you like this program, help us reach more people by clicking the ![Star](https://github.com/k9spud/appswipe/assets/39664841/243db019-dbc4-4bfa-bc9d-606690034b2e)
 button at the top of our [Github](https://github.com/k9spud/appswipe) page.
 It costs nothing and it helps App Swipe get listed higher up in Github 
 search results when people are looking for this sort of thing.
@@ -176,7 +172,7 @@ chown USER:USER appswipe.tmp
 chmod 0644 appswipe.tmp
 ```
 This feature may have security implications; it's use is optional. 
-If you don't provide user write permission to the file 
+If you don't provide your user writable permissions to the file 
 `/etc/portage/package.accept_keywords/appswipe.tmp`, App Swipe will
 silently skip doing automatic keyword unmasking.
 
@@ -212,9 +208,7 @@ way to close a tab.
 
 `SHIFT-Return` Navigates to the first result of an application search.
 
-`F5` Refreshes the browser view (soft reload)
-
-`CTRL-R` Reloads the SQLite database for the currently viewed app and refreshes view (hard reload).
+`CTRL-R` or `F5` Reloads the SQLite database for the currently viewed app and refreshes view.
 
 `ALT-Back Arrow Key` Displays the previous page in browser history.
 
