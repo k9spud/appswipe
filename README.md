@@ -17,19 +17,19 @@ With even more optimization, `Reload Database` should be slightly faster.
 
 Because database reloads are fairly fast now, there doesn't seem to be a 
 whole lot of reason to do a 'soft reload' when the user presses the Reload 
-button while viewing an app in the browser. Now the Reload button does a 
-'hard reload' regardless of whether CTRL or SHIFT is being held down.
+button while viewing an app in the browser. Changed the Reload button so it 
+does a "hard reload" regardless of whether CTRL or SHIFT was pressed.
 
-Fixed a bug where the backend process was trying to deference a nullptr
-when using the `-reload` command line option. This has probably prevented
-`hard reload` from working anyway (since v1.1.52, when the backend process 
-was implemented).
+Fixed a bug where the backend process tried deferencing a nullptr when 
+passed a `-reload` command line option. This probably prevented
+'hard reload' from working since v1.1.52, when the backend process 
+was implemented.
 
 Help Get the Word Out
 =====================
 
 If you like this program, help us reach more people by clicking the ![Star](https://github.com/k9spud/appswipe/assets/39664841/243db019-dbc4-4bfa-bc9d-606690034b2e)
-button at the top of our [Github](https://github.com/k9spud/appswipe) page.
+button at the top of this [Github](https://github.com/k9spud/appswipe) page.
 It costs nothing and it helps App Swipe get listed higher up in Github 
 search results when people are looking for this sort of thing.
 
