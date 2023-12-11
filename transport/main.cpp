@@ -195,7 +195,6 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     QString ebuild;
     QString appicon;
     QString action;
-    QString s;
     QString installedSize;
     QString iuse;
     QString useFlags;
@@ -211,6 +210,8 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     QStringList installtimeDeps;
     int firstUnmasked = -1;
     int firstMaskedTesting = -1;
+    int i;
+    QString s;
 
     QString versionSize;
 
@@ -534,7 +535,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                 }
                 else
                 {
-                    int i = s.indexOf(portage->arch);
+                    i = s.indexOf(portage->arch);
                     if(i == 0 || s.at(i - 1) == ' ')
                     {
                         s = "stable";
@@ -553,34 +554,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             {
                 s = "unknown";
             }
-/*            if(masked)
-            {
-                s = "masked";
-            }
-            else if(!s.contains(portage->arch))
-            {
-                if(s.contains("-*"))
-                {
-                    s = "broken";
-                }
-                else
-                {
-                    s = "unsupported";
-                }
-            }
-            else
-            {
-                int i = s.indexOf(portage->arch);
-                if(i == 0 || s.at(i - 1) == ' ')
-                {
-                    s = "stable";
-                }
-                else if(i > 0 && s.at(i-1) == '~')
-                {
-                    s = "testing";
-                }
-            }
-*/
+
             s = s + (obsoleted ? " (obsolete" + installedSize + ")" :
                      rowInstalled ? " (installed" + installedSize + ")" : "");
             if(rowInstalled)
@@ -632,17 +606,20 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             output << "<P><B>License: </B>" << Qt::flush << QString("%1</P>").arg(license);
         }
 
+        QStringList iuseList = iuse.remove("\n").split(' ', Qt::SkipEmptyParts);
         QStringList useList;
-        QStringList iuseList = iuse.remove("\n").split(' ');
+        int useListCount = 0;
         if(useFlags.isEmpty() == false)
         {
-            useList = useFlags.remove("\n").split(' ');
             QString useHtml;
-            QString s;
             QString flag;
             QString prefix;
-            foreach(s, useList)
+
+            useList = useFlags.remove("\n").split(' ', Qt::SkipEmptyParts);
+            useListCount = useList.count();
+            for(i = 0; i < useListCount; i++)
             {
+                s = useList.at(i);
                 if(s.startsWith('+') || s.startsWith('-'))
                 {
                     prefix = s.at(0);
@@ -671,11 +648,8 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
 
         if(iuse.isEmpty() == false)
         {
-            iuseList.removeAll("");
             iuseList.removeDuplicates();
-
-            QString s;
-            for(int i = 0; i < useList.count(); i++)
+            for(i = 0; i < useListCount; i++)
             {
                 s = useList.at(i);
                 if(iuseList.contains(s))
@@ -696,14 +670,16 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                 }
             }
 
-            if(iuseList.isEmpty() == false)
+            const int iuseListCount = iuseList.count();
+            if(iuseListCount)
             {
                 output << "<P><B>Unused Flags:</B> " << Qt::flush;
                 QString s;
                 QString flag;
                 QString prefix;
-                foreach(s, iuseList)
+                for(i = 0; i < iuseListCount; i++)
                 {
+                    s = iuseList.at(i);
                     if(s.startsWith('+') || s.startsWith('-'))
                     {
                         prefix = s.at(0);
@@ -798,7 +774,6 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                 output << printDependencies(deps, query, (installed == 0));
                 output << "</P>";
             }
-
         }
     }
 
@@ -983,6 +958,7 @@ QString findAppIcon(bool& hasIcon, QString category, QString package, QString ve
     QStringList smallIcons;
     QStringList desktopFiles;
     QString s;
+    int i;
     QString appicon = QString("/var/db/pkg/%1/%2-%3/CONTENTS").arg(category, package, version);
     input.setFileName(appicon);
     if(!input.open(QIODevice::ReadOnly))
@@ -992,12 +968,14 @@ QString findAppIcon(bool& hasIcon, QString category, QString package, QString ve
 
     s = input.readAll();
     input.close();
-    QStringList lines = s.split('\n');
-    foreach(s, lines)
+    QStringList lines = s.split('\n', Qt::SkipEmptyParts);
+    const int lineCount = lines.count();
+    for(i = 0; i < lineCount; i++)
     {
+        s = lines.at(i);
         s.remove('\n');
         s = s.trimmed();
-        if(s.isEmpty() || s.startsWith('#'))
+        if(s.startsWith('#') || s.isEmpty())
         {
             continue;
         }
