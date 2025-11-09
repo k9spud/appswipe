@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -61,17 +61,25 @@ void VersionString::parse(QString input)
     components.clear();
     vx.clear();
     vx.reserve(MAXVX);
-    while(position < input.count() && position != oldPosition)
+    while(position < input.size() && position != oldPosition)
     {
         oldPosition = position;
 
+#if QT_VERSION < 0x060000
         match = portage->separator.match(input, position, QRegularExpression::NormalMatch, QRegularExpression::AnchoredMatchOption);
+#else
+        match = portage->separator.match(input, position, QRegularExpression::NormalMatch, QRegularExpression::AnchorAtOffsetMatchOption);
+#endif
         if(match.hasMatch())
         {
             position = match.capturedEnd();
         }
 
+#if QT_VERSION < 0x060000
         match = portage->digitVersion.match(input, position, QRegularExpression::NormalMatch, QRegularExpression::AnchoredMatchOption);
+#else
+        match = portage->digitVersion.match(input, position, QRegularExpression::NormalMatch, QRegularExpression::AnchorAtOffsetMatchOption);
+#endif
         if(match.hasMatch())
         {
             s = match.captured(1);
@@ -81,7 +89,11 @@ void VersionString::parse(QString input)
         }
         else
         {
+#if QT_VERSION < 0x060000
             match = portage->alphaVersion.match(input, position, QRegularExpression::NormalMatch, QRegularExpression::AnchoredMatchOption);
+#else
+            match = portage->alphaVersion.match(input, position, QRegularExpression::NormalMatch, QRegularExpression::AnchorAtOffsetMatchOption);
+#endif
             if(match.hasMatch())
             {
                 s = match.captured(1);
@@ -97,6 +109,7 @@ void VersionString::parse(QString input)
     }
 
     QString revision = "0";
+    QRegularExpression digitsRegEx("^\\d+$");
     for(int i = 0; i < vx.count(); i++)
     {
         s = vx.at(i);
@@ -133,7 +146,7 @@ void VersionString::parse(QString input)
             vx.removeAt(i);
             vx.removeAt(i);
         }
-        else if(s == "p" && (i+1) < vx.count() && vx.at(i+1).contains(QRegExp("^\\d+$")))
+        else if(s == "p" && (i+1) < vx.count() && vx.at(i+1).contains(digitsRegEx))
         {
             // 'p' patch releases should be treated as a positive number, but we want to strip out the
             // letter 'p' to save database Vx columns for the really crazy long version numbers some packages have.
