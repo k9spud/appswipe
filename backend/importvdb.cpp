@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -33,6 +33,7 @@
 #include <QRegularExpression>
 #include <QStringList>
 #include <QVariant>
+#include <QMetaType>
 
 ImportVDB::ImportVDB()
 {
@@ -603,7 +604,7 @@ void ImportVDB::readMakeConf(QString filePath)
 
                 if(value.endsWith('"'))
                 {
-                    value = value.mid(1, value.count() - 2);
+                    value = value.mid(1, value.size() - 2);
                 }
                 else
                 {
@@ -1091,7 +1092,11 @@ bool ImportVDB::importInstalledPackage(QSqlQuery* query, QString category, QStri
 
     if(repoId == -1)
     {
+#if QT_VERSION < 0x060000
         query->bindValue(1, QVariant(QVariant::Int)); // NULL repoId
+#else
+        query->bindValue(1, QVariant(QMetaType::fromType<int>())); // NULL repoId
+#endif
     }
     else
     {
