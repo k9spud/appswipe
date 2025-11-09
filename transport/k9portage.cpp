@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -121,7 +121,11 @@ QVariant K9Portage::var(QString key)
         return vars[key];
     }
 
+#if QT_VERSION < 0x060000
     return QVariant(QVariant::String);
+#else
+    return QVariant(QMetaType::fromType<QString>());
+#endif
 }
 
 QString K9Portage::linkDependency(QString input, QString& category, QString& package)
@@ -172,6 +176,36 @@ QString K9Portage::linkDependency(QString input, QString& category, QString& pac
     input.replace("<", "&lt;");
     input.replace(">", "&gt;");
     return input;
+}
+
+void K9Portage::parseDependency(QString input, QString& category, QString& package)
+{
+    QRegularExpressionMatch match = dependLinkRE.match(input);
+    if(match.hasMatch())
+    {
+        QString filter = match.captured(1);
+        category = match.captured(2);
+        package = match.captured(3);
+        return;
+    }
+
+    match = dependLinkSlotRE.match(input);
+    if(match.hasMatch())
+    {
+        QString filter = match.captured(1);
+        category = match.captured(2);
+        package = match.captured(3);
+        return;
+    }
+
+    match = dependLinkAppRE.match(input);
+    if(match.hasMatch())
+    {
+        QString filter = match.captured(1);
+        category = match.captured(2);
+        package = match.captured(3);
+        return;
+    }
 }
 
 void K9Portage::md5cacheReader(QString fileName)
