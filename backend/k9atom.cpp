@@ -1,4 +1,4 @@
-// Copyright (c) 2023, K9spud LLC.
+// Copyright (c) 2023-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -162,7 +162,7 @@ bool K9Atom::globMatch(QString glob, QString s) const
             return glob == s;
         }
 
-        if(i == (glob.count() - 1))
+        if(i == (glob.size() - 1))
         {
             glob.chop(1);
             return s.startsWith(glob);

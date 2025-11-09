@@ -1,4 +1,4 @@
-// Copyright (c) 2023, K9spud LLC.
+// Copyright (c) 2023-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -47,7 +47,7 @@ QList<int> K9AtomList::findMatches(const QString& checkCategory, const QString& 
     QString key = QString("%1/%2").arg(checkCategory, checkPackage);
     QList<int> matchingIds;
 
-    QHash<QString, K9Atom>::const_iterator iter = atoms.find(key);
+    QMultiHash<QString, K9Atom>::const_iterator iter = atoms.find(key);
     while(iter != atoms.end() && iter.key() == key)
     {
         const K9Atom& atom = iter.value();

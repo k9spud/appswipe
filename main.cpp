@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -27,8 +27,10 @@
 
 int main(int argc, char *argv[])
 {
+#if QT_VERSION < 0x060000
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+#endif
     QCoreApplication::setOrganizationName("K9spud LLC");
     QCoreApplication::setApplicationName(APP_NAME);
     QCoreApplication::setApplicationVersion(APP_VERSION);

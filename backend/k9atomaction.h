@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2023, K9spud LLC.
+﻿// Copyright (c) 2023-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@ class K9AtomAction
 public:
     K9AtomAction();
 
-    bool operator==(const K9AtomAction a);
+    bool operator==(const K9AtomAction& a) const;
 
     enum AtomActionType
     {

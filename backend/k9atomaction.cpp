@@ -1,4 +1,4 @@
-// Copyright (c) 2023, K9spud LLC.
+// Copyright (c) 2023-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -21,7 +21,7 @@ K9AtomAction::K9AtomAction()
 
 }
 
-bool K9AtomAction::operator==(const K9AtomAction a)
+bool K9AtomAction::operator==(const K9AtomAction& a) const
 {
     if(a.actionType == actionType && a.action == action)
     {

@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -244,7 +244,7 @@ bool K9Portage::keywordMatch(QString acceptKeywords, QString appKeywords)
         {
             foreach(s, appKeywordsList)
             {
-                if(s.count() > 0 && s.startsWith('~') == false)
+                if(s.size() > 0 && s.startsWith('~') == false)
                 {
                     return true;
                 }
@@ -260,7 +260,7 @@ bool K9Portage::keywordMatch(QString acceptKeywords, QString appKeywords)
                 }
             }
         }
-        else if(s.count())
+        else if(s.size())
         {
             keys.append(s);
         }

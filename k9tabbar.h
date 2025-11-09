@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -50,7 +50,11 @@ protected:
     virtual void dragEnterEvent(QDragEnterEvent *event) override;
     virtual void dropEvent(QDropEvent *event) override;
 
+#if QT_VERSION < 0x060000
     virtual void enterEvent(QEvent *event) override;
+#else
+    virtual void enterEvent(QEnterEvent *event) override;
+#endif
     virtual void leaveEvent(QEvent *event) override;
 
     QLabel* label;

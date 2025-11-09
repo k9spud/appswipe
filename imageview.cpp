@@ -1,4 +1,4 @@
-// Copyright (c) 2023, K9spud LLC.
+// Copyright (c) 2023-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -837,7 +837,7 @@ void ImageView::moveNext()
         currentItem = 0;
         composite->setStatus("Reached end of files, looping back to beginning.");
     }
-    QFileInfo fi = fileList.at(currentItem);
+    QFileInfo fi(fileList.at(currentItem));
     if(fi.size() == 0)
     {
         if(currentItem != 0)
@@ -875,7 +875,7 @@ void ImageView::movePrevious()
     {
         currentItem = fileList.count() - 1;
     }
-    QFileInfo fi = fileList.at(currentItem);
+    QFileInfo fi(fileList.at(currentItem));
 
     if(fi.size() == 0)
     {

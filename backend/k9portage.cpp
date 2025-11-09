@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -178,7 +178,11 @@ QVariant K9Portage::var(QString key)
         return vars[key];
     }
 
+#if QT_VERSION < 0x060000
     return QVariant(QVariant::String);
+#else
+    return QVariant(QMetaType::fromType<QString>());
+#endif
 }
 
 void K9Portage::parseVerCut(QString& value)

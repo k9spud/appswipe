@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -142,7 +142,11 @@ void K9TabBar::dropEvent(QDropEvent* event)
     if(mime != nullptr)
     {
         TabWidget* tabWidget = qobject_cast<TabWidget*>(parent());
+#if QT_VERSION < 0x060000
         int dropAt = tabAt(event->pos());
+#else
+        int dropAt = tabAt(event->position().toPoint());
+#endif
         if(dropAt == -1)
         {
             dropAt = tabWidget->insertAfter;
@@ -150,10 +154,17 @@ void K9TabBar::dropEvent(QDropEvent* event)
         else
         {
             QRect rect = tabRect(dropAt);
+#if QT_VERSION < 0x060000
             if(event->pos().y() >= (rect.y() + rect.height() / 2))
             {
                 dropAt++;
             }
+#else
+            if(event->position().y() >= (rect.y() + rect.height() / 2))
+            {
+                dropAt++;
+            }
+#endif
         }
 
         if(event->source() == this)
@@ -325,7 +336,11 @@ void K9TabBar::showTabLabel(int tab)
     labeledTab = tab;
 }
 
+#if QT_VERSION < 0x060000
 void K9TabBar::enterEvent(QEvent* event)
+#else
+void K9TabBar::enterEvent(QEnterEvent* event)
+#endif
 {
     QEnterEvent* e = static_cast<QEnterEvent*>(event);
     if(e == nullptr)
@@ -333,7 +348,11 @@ void K9TabBar::enterEvent(QEvent* event)
         qDebug() << event;
         return;
     }
+#if QT_VERSION < 0x060000
     QPoint pos = e->pos();
+#else
+    QPoint pos = e->position().toPoint();
+#endif
     int tab = tabAt(pos);
     showTabLabel(tab);
 
