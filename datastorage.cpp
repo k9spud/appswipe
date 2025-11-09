@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -346,13 +346,11 @@ bool DataStorage::runSqlScript(QSqlDatabase& db, QString scriptFileName)
     QStringList statements = lines.join('\n').split(';');
     QSqlQuery query(db);
     QString sql;
-
-    foreach(data, statements)
+    const int statementsCount = statements.count();
+    for(i = 0; i < statementsCount; i++)
     {
-        sql = data;
-        data.remove('\n');
-        data = data.trimmed();
-        if(data.isEmpty())
+        sql = data = statements.at(i);
+        if(data.remove("\n").trimmed().isEmpty())
         {
             continue;
         }
