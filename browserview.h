@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -121,6 +121,7 @@ protected:
     QTimer longPressTimer;
     QPoint startPress;
     QPoint startLongPress;
+    QPoint startLongPressGlobalPosition;
     bool eatPress;
     virtual void contextMenuEvent(QContextMenuEvent *event) override;
 
