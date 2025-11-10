@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -72,16 +72,31 @@ BrowserView::BrowserView(QWidget *parent) : QTextEdit(parent)
     composite = qobject_cast<CompositeView*>(parent);
     process = nullptr;
     document()->setDefaultStyleSheet(R"EOF(
-                                     a { color: rgb(181, 229, 229); }
+        a { color: rgb(181, 229, 229); }
 
-                                     table.normal
-                                     {
-                                         color: white;
-                                         border-style: none;
-                                         background-color: #101A20;
-                                     }
+        table.normal
+        {
+            color: white;
+            border-style: none;
+            border-collapse: collapse;
+        }
+
+        td
+        {
+            background-color: #101A20;
+            padding: 1px;
+        }
+
+        td.hr
+        {
+            padding: 0px;
+        }
+
+        td.highlight
+        {
+            background-color: #101A40;
+        }
 )EOF");
-
     setReadOnly(true);
     setTabChangesFocus(false);
     setTextInteractionFlags(Qt::TextBrowserInteraction);
@@ -705,7 +720,7 @@ void BrowserView::quseProcessFinished(int exitCode, QProcess::ExitStatus exitSta
         if(index >= 0)
         {
             app = s.left(index);
-            s = s.mid(index + match.count());
+            s = s.mid(index + match.size());
 
             if(app == "global")
             {
@@ -1172,7 +1187,12 @@ void BrowserView::mousePressEvent(QMouseEvent* event)
     {
         animationTimer.stop(); // immediately stop swipe scrolling if user presses screen
 
+#if QT_VERSION < 0x060000
         startPress = startLongPress = event->pos();
+#else
+        startPress = startLongPress = event->position().toPoint();
+        startLongPressGlobalPosition = event->globalPosition().toPoint();
+#endif
         longPressTimer.start(LONGPRESS_MSECS_THRESHOLD);
 
         QPointF p = event->pos();
@@ -1182,7 +1202,11 @@ void BrowserView::mousePressEvent(QMouseEvent* event)
         if(hit == -1)
         {
             scrollGrabbed = true;
+#if QT_VERSION < 0x060000
             oldY = event->globalY();
+#else
+            oldY = event->globalPosition().y();
+#endif
             oldScrollValue = verticalScrollBar()->value();
             return;
         }
@@ -1197,7 +1221,11 @@ void BrowserView::longPressTimeout()
 {
     longPressTimer.stop();
     QContextMenuEvent::Reason reason = QContextMenuEvent::Mouse;
+#if QT_VERSION < 0x060000
     QContextMenuEvent e(reason, startLongPress);
+#else
+    QContextMenuEvent e(reason, startLongPress, startLongPressGlobalPosition);
+#endif
     contextMenuEvent(&e);
     eatPress = true;
     scrollGrabbed = false;
@@ -1224,13 +1252,22 @@ void BrowserView::mouseMoveEvent(QMouseEvent* event)
         {
             // reset long press click timer if mouse is being moved around.
             longPressTimer.start(LONGPRESS_MSECS_THRESHOLD);
+#if QT_VERSION < 0x060000
             startLongPress = event->pos();
+#else
+            startLongPress = event->position().toPoint();
+            startLongPressGlobalPosition = event->globalPosition().toPoint();
+#endif
         }
     }
 
     if(scrollGrabbed)
     {
+#if QT_VERSION < 0x060000
         dy = event->globalY() - oldY;
+#else
+        dy = event->globalPosition().y() - oldY;
+#endif
         if(swiping == false)
         {
             if(abs(dy) < START_SWIPE_THRESHOLD)
@@ -1254,12 +1291,20 @@ void BrowserView::mouseMoveEvent(QMouseEvent* event)
             if(dy > RELOAD_THRESHOLD)
             {
                 swiping = false;
+#if QT_VERSION < 0x060000
                 oldY = event->globalY();
-            }
+#else
+                oldY = event->globalPosition().y();
+#endif
+           }
         }
         else
         {
+#if QT_VERSION < 0x060000
             oldY = event->globalY();
+#else
+            oldY = event->globalPosition().y();
+#endif
         }
         return;
     }
@@ -1394,7 +1439,7 @@ void BrowserView::mouseReleaseEvent(QMouseEvent* event)
 
 void BrowserView::keyPressEvent(QKeyEvent* event)
 {
-    if(event->modifiers() == (Qt::ControlModifier + Qt::ShiftModifier))
+    if(event->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier))
     {
         switch(event->key())
         {
@@ -2008,7 +2053,7 @@ void BrowserView::contextMenuEvent(QContextMenuEvent* event)
 QString BrowserView::appNoVersion(QString app)
 {
     int versionIndex = app.lastIndexOf('-');
-    if(versionIndex < app.count() && app.at(versionIndex + 1) == 'r')
+    if(versionIndex < app.size() && app.at(versionIndex + 1) == 'r')
     {
         versionIndex = app.lastIndexOf('-', versionIndex - 1);
     }
@@ -2027,7 +2072,7 @@ QString BrowserView::appNoVersion(QString app)
 QString BrowserView::appVersion(QString app)
 {
     int versionIndex = app.lastIndexOf('-');
-    if(versionIndex < app.count() && app.at(versionIndex + 1) == 'r')
+    if(versionIndex < app.size() && app.at(versionIndex + 1) == 'r')
     {
         versionIndex = app.lastIndexOf('-', versionIndex - 1);
     }
