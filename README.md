@@ -30,17 +30,17 @@ Installation
 
 There is an ebuild for App Swipe in my 
 [k9spud-overlay](https://github.com/k9spud/k9spud-overlay). 
-Alternatively, there is an App Swipe ebuild in the 
+Alternatively, there is an old App Swipe ebuild in the 
 [Project GURU](https://wiki.gentoo.org/wiki/Project:GURU) 
-repository, although theirs may lag behind since I don't personally maintain 
-their ebuild.
+repository, but don't use that, it doesn't seem to be maintained.
 
 To add the k9spud-overlay to your system, do the following:
 
 ```console
 sudo su -
 cd /var/db/repos
-git clone https://www.github.com/k9spud/k9spud-overlay.git k9spud
+git clone https://github.com/k9spud/k9spud-overlay.git k9spud
+mkdir /etc/portage/repos.conf
 nano -w /etc/portage/repos.conf/k9spud-overlay.conf
 ```
 
@@ -51,7 +51,7 @@ Insert the following text into the k9spud-overlay.conf file:
 
 location = /var/db/repos/k9spud
 sync-type = git
-sync-uri = https://www.github.com/k9spud/k9spud-overlay.git
+sync-uri = https://github.com/k9spud/k9spud-overlay.git
 priority = 200
 auto-sync = yes
 clone-depth = 1
@@ -62,7 +62,8 @@ sync-gitclone-extra-opts = --single-branch --branch main
 After that, use the following to install App Swipe:
 
 ```console
-emerge app-portage/appswipe
+echo "app-portage/appswipe ~amd64" > /etc/portage/package.accept_keywords/appswipe
+emerge --ask app-portage/appswipe
 ```
 
 If all went well, you can now run the `appswipe` program.
