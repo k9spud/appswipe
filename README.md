@@ -1,7 +1,7 @@
 
 App Swipe
 =========
-Copyright (c) 2021-2023, K9spud LLC
+Copyright (c) 2021-2025, K9spud LLC
 
 This is an application for browsing your local Portage repository files.
 Easily manage your system's applications from a point and click user interface
@@ -10,20 +10,12 @@ upgrading apps.
 
 ![Screenshot](https://github.com/k9spud/appswipe/assets/39664841/754e807d-4e57-457e-8d54-554d38e8a070)
 
-What's New in v1.1.68?
-======================
+What's New in v1.2.0?
+=====================
 
-With even more optimization, `Reload Database` should be slightly faster.
+Now compiles under Qt 6! Still compiles under Qt 5 too, if you want that.
 
-Because database reloads are fairly fast now, there doesn't seem to be a 
-whole lot of reason to do a 'soft reload' when the user presses the Reload 
-button while viewing an app in the browser. Changed the Reload button so it 
-does a "hard reload" regardless of whether CTRL or SHIFT was pressed.
-
-Fixed a bug where the backend process tried deferencing a nullptr when 
-passed a `-reload` command line option. This probably prevented
-'hard reload' from working since v1.1.52, when the backend process 
-was implemented.
+Improved the dependencies display to match more closely with Portage.
 
 Help Get the Word Out
 =====================
