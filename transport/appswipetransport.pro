@@ -1,4 +1,4 @@
-QT += core gui sql svg
+QT += core gui sql svg widgets
 
 CONFIG += c++11
 # CONFIG -= app_bundle
