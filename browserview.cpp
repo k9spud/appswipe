@@ -81,7 +81,7 @@ BrowserView::BrowserView(QWidget *parent) : QTextEdit(parent)
             border-collapse: collapse;
         }
 
-        td
+        td.bl
         {
             background-color: #101A20;
             padding: 1px;
@@ -89,6 +89,7 @@ BrowserView::BrowserView(QWidget *parent) : QTextEdit(parent)
 
         td.hr
         {
+            background-color: #101A20;
             padding: 0px;
         }
 
