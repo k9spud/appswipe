@@ -62,7 +62,6 @@ sync-gitclone-extra-opts = --single-branch --branch main
 After that, use the following to install App Swipe:
 
 ```console
-echo "app-portage/appswipe ~amd64" > /etc/portage/package.accept_keywords/appswipe
 emerge --ask app-portage/appswipe
 ```
 
