@@ -1,4 +1,4 @@
-// Copyright (c) 2023, K9spud LLC.
+// Copyright (c) 2023-2025, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,7 +19,6 @@
 #include "k9portage.h"
 #include "datastorage.h"
 
-#include <signal.h>
 #include <QApplication>
 #include <QProcessEnvironment>
 
@@ -46,10 +45,10 @@ int viewWidth = 0, viewHeight = 0;
 void viewApp(const QUrl& url);
 QString appVersion(QString app);
 QString appNoVersion(QString app);
-void removeDuplicateDeps(QStringList& target, QStringList& source);
-int outerDepMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex);
-void skipNode(QStringList& nodes, int& index);
-int depMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex);
+void removeDuplicateDeps(QStringList& target, const QStringList& source);
+int outerDepMatch(QStringList& target, int& targetIndex, const QStringList& source, int sourceIndex);
+void skipNode(const QStringList& nodes, int& index);
+int depMatch(QStringList& target, int& targetIndex, const QStringList& source, int sourceIndex);
 QString findAppIcon(bool& hasIcon, QString category, QString package, QString version);
 QString printDependencies(QStringList dependencies, QSqlQuery& query, bool flagMissing);
 
@@ -58,7 +57,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("K9spud LLC");
     QCoreApplication::setApplicationName(APP_NAME);
     QCoreApplication::setApplicationVersion(APP_VERSION);
-    QApplication a(argc, argv);
+    QApplication a(argc, argv); // Note: this MUST stay as QApplication, not QCoreApplication. Otherwise, viewing an app with an SVG image crashes (example: dev-embedded/stlink).
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     if(env.contains("RET_CODE"))
@@ -130,6 +129,61 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+void loadDependencies(QString repo, QString category, QString package, QString version, QString& installDepend, QString& libDepend, QString &buildDepend, QString& runDepend, QString& postDepend)
+{
+    QString s;
+    s = QString("/var/db/pkg/%1/%2-%3/PF").arg(category, package, version);
+    if(QFile::exists(s))
+    {
+        QFile input;
+        s = QString("/var/db/pkg/%1/%2-%3/DEPEND").arg(category, package, version);
+        input.setFileName(s);
+        if(input.open(QIODevice::ReadOnly))
+        {
+            libDepend = input.readAll();
+            input.close();
+        }
+
+        s = QString("/var/db/pkg/%1/%2-%3/BDEPEND").arg(category, package, version);
+        input.setFileName(s);
+        if(input.open(QIODevice::ReadOnly))
+        {
+            buildDepend = input.readAll();
+            input.close();
+        }
+
+        s = QString("/var/db/pkg/%1/%2-%3/RDEPEND").arg(category, package, version);
+        input.setFileName(s);
+        if(input.open(QIODevice::ReadOnly))
+        {
+            runDepend = input.readAll();
+            input.close();
+        }
+
+        s = QString("/var/db/pkg/%1/%2-%3/PDEPEND").arg(category, package, version);
+        input.setFileName(s);
+        if(input.open(QIODevice::ReadOnly))
+        {
+            postDepend = input.readAll();
+            input.close();
+        }
+        return;
+    }
+
+    s = QString("/var/db/repos/%1/metadata/md5-cache/%2/%3-%4").arg(repo, category, package, version);
+    if(QFile::exists(s))
+    {
+        portage->vars.clear();
+        portage->md5cacheReader(s);
+        installDepend = portage->var("IDEPEND").toString();
+        libDepend = portage->var("DEPEND").toString();
+        buildDepend = portage->var("BDEPEND").toString();
+        runDepend = portage->var("RDEPEND").toString();
+        postDepend = portage->var("PDEPEND").toString();
+        return;
+    }
+}
+
 void viewApp(const QUrl& url)
 {
     QSqlDatabase db;
@@ -149,7 +203,7 @@ void viewApp(const QUrl& url)
     db.setDatabaseName(ds->storageFolder + ds->databaseFileName);
     db.open();
     QSqlQuery query(db);
-    query.prepare(R"EOF(
+    query.prepare(QStringLiteral(R"EOF(
 select
     r.REPO, p.PACKAGE, p.VERSION, p.DESCRIPTION, p.INSTALLED, p.OBSOLETED, p.SLOT, p.HOMEPAGE, p.LICENSE,
     p.KEYWORDS, p.IUSE, c.CATEGORY, p.PACKAGE, p.MASKED, p.DOWNLOADSIZE, p.PACKAGEID, p.SUBSLOT
@@ -158,7 +212,7 @@ inner join CATEGORY c on c.CATEGORYID = p.CATEGORYID
 inner join REPO r on r.REPOID = p.REPOID
 where c.CATEGORY=? and p.PACKAGE=?
 order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 desc, p.V7 desc, p.V8 desc, p.V9 desc, p.V10 desc
-)EOF");
+)EOF"));
 
     QString search = url.path(QUrl::FullyDecoded);
     QStringList x = search.split('/');
@@ -200,14 +254,18 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     QString useFlags;
     QString cFlags;
     QString cxxFlags;
-    QString installDepend;  // DEPEND - dependencies for CHOST, i.e. packages that need to be found on built system, e.g. libraries and headers.
+    QString installDepend;  // IDEPEND - needed during the pkg_postinst phase and can be unmerged afterwards.
+    QString libDepend;      // DEPEND  - libraries, headers, and packages that need to be found on target system
     QString buildDepend;    // BDEPEND - dependencies applicable to CBUILD, i.e. programs that need to be executed during the build, e.g. virtual/pkgconfig.
     QString runDepend;      // RDEPEND - dependencies which are required at runtime, such as libraries (when dynamically linked), any data packages and (for interpreted languages) the relevant interpreter. When installing from a binary package, only RDEPEND will be checked.
     QString postDepend;     // PDEPEND - runtime dependencies that do not strictly require being satisfied immediately. They can be merged after the package.
     QString lastBuilt;
-    QStringList runtimeDeps;
-    QStringList optionalDeps;
-    QStringList installtimeDeps;
+    QStringList installDeps;
+    QStringList libDeps;
+    QStringList buildDeps;
+    QStringList runDeps;
+    QStringList postDeps;
+
     int firstUnmasked = -1;
     int firstMaskedTesting = -1;
     int i;
@@ -317,38 +375,6 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                 input.close();
             }
 
-            s = QString("/var/db/pkg/%1/%2-%3/DEPEND").arg(category, package, version);
-            input.setFileName(s);
-            if(input.open(QIODevice::ReadOnly))
-            {
-                installDepend = input.readAll();
-                input.close();
-            }
-
-            s = QString("/var/db/pkg/%1/%2-%3/BDEPEND").arg(category, package, version);
-            input.setFileName(s);
-            if(input.open(QIODevice::ReadOnly))
-            {
-                buildDepend = input.readAll();
-                input.close();
-            }
-
-            s = QString("/var/db/pkg/%1/%2-%3/RDEPEND").arg(category, package, version);
-            input.setFileName(s);
-            if(input.open(QIODevice::ReadOnly))
-            {
-                runDepend = input.readAll();
-                input.close();
-            }
-
-            s = QString("/var/db/pkg/%1/%2-%3/PDEPEND").arg(category, package, version);
-            input.setFileName(s);
-            if(input.open(QIODevice::ReadOnly))
-            {
-                postDepend = input.readAll();
-                input.close();
-            }
-
             s = QString("/var/db/pkg/%1/%2-%3/BUILD_TIME").arg(category, package, version);
             input.setFileName(s);
             if(input.open(QIODevice::ReadOnly))
@@ -357,19 +383,8 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                 input.close();
             }
         }
-        else
-        {
-            s = QString("/var/db/repos/%1/metadata/md5-cache/%2/%3-%4").arg(repo, category, package, version);
-            if(QFile::exists(s))
-            {
-                portage->vars.clear();
-                portage->md5cacheReader(s);
-                installDepend = portage->var("DEPEND").toString();
-                buildDepend = portage->var("BDEPEND").toString();
-                runDepend = portage->var("RDEPEND").toString();
-                postDepend = portage->var("PDEPEND").toString();
-            }
-        }
+
+        loadDependencies(repo, category, package, version, installDepend, libDepend, buildDepend, runDepend, postDepend);
 
         s = QString("/var/lib/portage/world");
         input.setFileName(s);
@@ -461,9 +476,10 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
         {
             output << (" (@world member)");
         }
-        output << ("</TD></TR>\n");
-        output << ("<TR><TD><HR></TD><TD><HR></TD><TD><HR></TD><TD><HR></TD><TD><HR></TD></TR>");
+        output << ("</TD><TD></TD></TR>\n");
+        output << ("<TR><TD CLASS=\"hr\"><HR></TD><TD CLASS=\"hr\"><HR></TD><TD CLASS=\"hr\"><HR></TD><TD CLASS=\"hr\"><HR></TD><TD CLASS=\"hr\"><HR></TD><TD CLASS=\"hr\"><HR></TD></TR>");
 
+        QString rowClass;
         int rowId;
         query.first();
         do
@@ -560,42 +576,47 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             if(rowInstalled)
             {
                 action = "uninstall";
+                rowClass = "CLASS=\"highlight\"";
             }
             else
             {
-                if(masked)
-                {
-                    action = "unmask";
-                }
-                else
-                {
-                    action = "install";
-                }
+                action = "install";
+                rowClass.clear();
             }
 
             versionSize = QString("<A HREF=\"%1:%2/%3-%4\">%4</A>").arg(action, category, package, version);
             output << ("<TR>");
             if(rowId == packageId)
             {
-                output << ("<TD>&#9656;</TD>");
+                output << QString("<TD %1><B>&raquo;&nbsp;&nbsp;</B></TD>").arg(rowClass);
             }
             else
             {
-                output << ("<TD></TD>");
+                output << QString("<TD %1></TD>").arg(rowClass);
             }
-            output << (QString("<TD><A HREF=\"file://%2\">%1</A>&nbsp;&nbsp;</TD>").arg(repo, ebuild));
+            output << (QString("<TD %3><A HREF=\"file://%2\">%1</A>&nbsp;&nbsp;</TD>").arg(repo, ebuild, rowClass));
 
             if(subslot.isEmpty())
             {
-                output << (QString("<TD>%1&nbsp;&nbsp;</TD>").arg(slot));
+                output << (QString("<TD %2>%1&nbsp;&nbsp;</TD>").arg(slot, rowClass));
             }
             else
             {
-                output << (QString("<TD>%1/%2&nbsp;&nbsp;</TD>").arg(slot, subslot));
+                output << (QString("<TD %3>%1/%2&nbsp;&nbsp;</TD>").arg(slot, subslot, rowClass));
             }
 
-            output << (QString("<TD>%1&nbsp;&nbsp;</TD>").arg(versionSize));
-            output << (QString("<TD>%1</TD>").arg(s));
+            output << (QString("<TD %2>%1&nbsp;&nbsp;</TD>").arg(versionSize, rowClass));
+            output << (QString("<TD %2>%1</TD>").arg(s, rowClass));
+
+            if(rowId == packageId)
+            {
+                output << QString("<TD %1><B>&nbsp;&nbsp;&laquo;</B></TD>").arg(rowClass);
+            }
+            else
+            {
+                output << QString("<TD %1></TD>").arg(rowClass);
+            }
+
             output << ("</TR>\n");
         } while(query.next());
         output << "</TABLE></P>";
@@ -634,6 +655,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
 
                 if(iuseList.contains(flag) == false && iuseList.contains("+" + flag) == false && iuseList.contains("-" + flag) == false)
                 {
+                    // don't show extraneous USE flags that aren't part of the app's IUSE list
                     continue;
                 }
 
@@ -649,6 +671,21 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
         if(iuse.isEmpty() == false)
         {
             iuseList.removeDuplicates();
+            int removed;
+            for(i = 0; i < iuseList.count(); i++)
+            {
+                s = iuseList.at(i);
+                if(s.startsWith('+') || s.startsWith('-'))
+                {
+                    removed = iuseList.removeAll(s.mid(1));
+                    i -= removed;
+                    if(i < 0)
+                    {
+                        i = 0;
+                    }
+                }
+            }
+
             for(i = 0; i < useListCount; i++)
             {
                 s = useList.at(i);
@@ -663,6 +700,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
                     iuseList.removeAll(s);
                 }
 
+                s = useList.at(i);
                 s.prepend('-');
                 if(iuseList.contains(s))
                 {
@@ -719,59 +757,67 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             output << "<P><B>Keywords:</B> " << Qt::flush << QString("%1</P>").arg(keywords);
         }
 
+        if(buildDepend.isEmpty() == false)
+        {
+            buildDeps = buildDepend.remove("\n").split(' ', Qt::SkipEmptyParts);
+            if(buildDeps.count())
+            {
+                output << "<P><B>Dependencies needed during build (BDEPEND)" << Qt::flush << ":</B></P><P>";
+                output << printDependencies(buildDeps, query, (installed == 0));
+                output << "</P>";
+            }
+        }
+
+        if(libDepend.isEmpty() == false)
+        {
+            libDeps = libDepend.remove("\n").split(' ', Qt::SkipEmptyParts);
+            removeDuplicateDeps(libDeps, buildDeps);
+            if(libDeps.count())
+            {
+                output << "<P><B>Dependencies on libraries, headers, etc (DEPEND)" << Qt::flush << ":</B></P><P>";
+                output << printDependencies(libDeps, query, (installed == 0));
+                output << "</P>";
+            }
+        }
+
+        if(installDepend.isEmpty() == false)
+        {
+            installDeps = installDepend.remove("\n").split(' ', Qt::SkipEmptyParts);
+            removeDuplicateDeps(installDeps, buildDeps);
+            removeDuplicateDeps(installDeps, libDeps);
+            if(installDeps.count())
+            {
+                output << "<P><B>Dependencies needed during installation (IDEPEND)" << Qt::flush << ":</B></P><P>";
+                output << printDependencies(installDeps, query, (installed == 0));
+                output << "</P>";
+            }
+        }
+
         if(runDepend.isEmpty() == false)
         {
-            runtimeDeps = runDepend.remove("\n").split(' ');
-            if(runtimeDeps.count())
+            runDeps = runDepend.remove("\n").split(' ', Qt::SkipEmptyParts);
+            removeDuplicateDeps(runDeps, buildDeps);
+            removeDuplicateDeps(runDeps, libDeps);
+            removeDuplicateDeps(runDeps, installDeps);
+            if(runDeps.count())
             {
-                if(installDepend == runDepend)
-                {
-                    output << "<P><B>Dependencies" << Qt::flush << ":</B></P><P>";
-                }
-                else
-                {
-                    output << "<P><B>Dependencies for run-time use" << Qt::flush << ":</B></P><P>";
-                }
-
-                output << printDependencies(runtimeDeps, query, (installed == 0));
+                output << "<P><B>Dependencies needed at runtime (RDEPEND)" << Qt::flush << ":</B></P><P>";
+                output << printDependencies(runDeps, query, (installed == 0));
                 output << "</P>";
             }
         }
 
         if(postDepend.isEmpty() == false)
         {
-            optionalDeps = postDepend.remove("\n").split(' ');
-            if(optionalDeps.count())
+            postDeps = postDepend.remove("\n").split(' ', Qt::SkipEmptyParts);
+            removeDuplicateDeps(postDeps, buildDeps);
+            removeDuplicateDeps(postDeps, libDeps);
+            removeDuplicateDeps(postDeps, installDeps);
+            removeDuplicateDeps(postDeps, runDeps);
+            if(postDeps.count())
             {
-                output << "<P><B>Dependencies not strictly required at run-time" << Qt::flush << ":</B></P><P>";
-                output << printDependencies(optionalDeps, query, (installed == 0));
-                output << "</P>";
-            }
-        }
-
-        if(installDepend.isEmpty() == false && runDepend != installDepend)
-        {
-            installtimeDeps = installDepend.remove("\n").split(' ');
-            removeDuplicateDeps(installtimeDeps, runtimeDeps);
-            removeDuplicateDeps(installtimeDeps, optionalDeps);
-            if(installtimeDeps.count())
-            {
-                output << "<P><B>Dependencies for installing package" << Qt::flush << ":</B></P><P>";
-                output << printDependencies(installtimeDeps, query, (installed == 0));
-                output << "</P>";
-            }
-        }
-
-        if(buildDepend.isEmpty() == false && runDepend != buildDepend)
-        {
-            QStringList deps = buildDepend.remove("\n").split(' ');
-            removeDuplicateDeps(deps, runtimeDeps);
-            removeDuplicateDeps(deps, optionalDeps);
-            removeDuplicateDeps(deps, installtimeDeps);
-            if(deps.count())
-            {
-                output << "<P><B>Dependencies for building from source" << Qt::flush << ":</B></P><P>";
-                output << printDependencies(deps, query, (installed == 0));
+                output << "<P><B>Dependencies not strictly needed immediately (PDEPEND)" << Qt::flush << ":</B></P><P>";
+                output << printDependencies(postDeps, query, (installed == 0));
                 output << "</P>";
             }
         }
@@ -783,7 +829,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     error << "isWorld " << (isWorld ? "1" : "0") << Qt::endl;
 }
 
-int depMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex)
+int depMatch(QStringList& target, int& targetIndex, const QStringList& source, int sourceIndex)
 {
     if(targetIndex < 0 || sourceIndex < 0)
     {
@@ -829,7 +875,7 @@ int depMatch(QStringList& target, int& targetIndex, QStringList& source, int sou
     return i;
 }
 
-void skipNode(QStringList& nodes, int& index)
+void skipNode(const QStringList& nodes, int& index)
 {
     int parens = 0;
     QString s;
@@ -853,7 +899,7 @@ void skipNode(QStringList& nodes, int& index)
     }
 }
 
-int outerDepMatch(QStringList& target, int& targetIndex, QStringList& source, int sourceIndex)
+int outerDepMatch(QStringList& target, int& targetIndex, const QStringList& source, int sourceIndex)
 {
     QString s = target.at(targetIndex);
     int j = source.indexOf(s, sourceIndex);
@@ -873,7 +919,7 @@ int outerDepMatch(QStringList& target, int& targetIndex, QStringList& source, in
     return outerDepMatch(target, targetIndex, source, j);
 }
 
-void removeDuplicateDeps(QStringList& target, QStringList& source)
+void removeDuplicateDeps(QStringList& target, const QStringList& source)
 {
     int i = 0;
     QString s;
@@ -916,7 +962,7 @@ void removeDuplicateDeps(QStringList& target, QStringList& source)
 QString appNoVersion(QString app)
 {
     int versionIndex = app.lastIndexOf('-');
-    if(versionIndex < app.count() && app.at(versionIndex + 1) == 'r')
+    if(versionIndex < app.size() && app.at(versionIndex + 1) == 'r')
     {
         versionIndex = app.lastIndexOf('-', versionIndex - 1);
     }
@@ -935,7 +981,7 @@ QString appNoVersion(QString app)
 QString appVersion(QString app)
 {
     int versionIndex = app.lastIndexOf('-');
-    if(versionIndex < app.count() && app.at(versionIndex + 1) == 'r')
+    if(versionIndex < app.size() && app.at(versionIndex + 1) == 'r')
     {
         versionIndex = app.lastIndexOf('-', versionIndex - 1);
     }
@@ -1048,7 +1094,7 @@ QString printDependencies(QStringList dependencies, QSqlQuery& query, bool flagM
             category.clear();
             package.clear();
             s = portage->linkDependency(s, category, package);
-            if(category.count() && package.count())
+            if(category.size() && package.size())
             {
                 s = category;
                 s.append('/');
