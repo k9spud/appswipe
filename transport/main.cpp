@@ -470,13 +470,13 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             output << QString("</TD><TD><P><BR><B>&nbsp;<A HREF=\"clip:%1/%2\">%1/%2</A></B></P><P>&nbsp;%3</P><P>&nbsp;%4</P></TD></TR></TABLE>").arg(category, package, description, homePage); // << Qt::endl;
         }
 
-        output << ("<P><TABLE BORDER=0 CLASS=\"normal\">");
-        output << ("<TR><TD></TD><TD><B>Repository&nbsp;&nbsp;</B></TD><TD><B>Slot&nbsp;&nbsp;</B></TD><TD><B>Version&nbsp;&nbsp;</B></TD><TD><B>Status</B>");
+        output << ("<P><TABLE CLASS=\"normal\">");
+        output << ("<TR><TD CLASS=\"bl\"></TD><TD CLASS=\"bl\"><B>Repository&nbsp;&nbsp;</B></TD><TD CLASS=\"bl\"><B>Slot&nbsp;&nbsp;</B></TD><TD CLASS=\"bl\"><B>Version&nbsp;&nbsp;</B></TD><TD CLASS=\"bl\"><B>Status</B>");
         if(isWorld)
         {
             output << (" (@world member)");
         }
-        output << ("</TD><TD></TD></TR>\n");
+        output << ("</TD><TD CLASS=\"bl\"></TD></TR>\n");
         output << ("<TR><TD CLASS=\"hr\"><HR></TD><TD CLASS=\"hr\"><HR></TD><TD CLASS=\"hr\"><HR></TD><TD CLASS=\"hr\"><HR></TD><TD CLASS=\"hr\"><HR></TD><TD CLASS=\"hr\"><HR></TD></TR>");
 
         QString rowClass;
@@ -581,7 +581,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             else
             {
                 action = "install";
-                rowClass.clear();
+                rowClass = " CLASS=\"bl\"";
             }
 
             versionSize = QString("<A HREF=\"%1:%2/%3-%4\">%4</A>").arg(action, category, package, version);
