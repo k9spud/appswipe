@@ -1,4 +1,4 @@
-// Copyright (c) 2023, K9spud LLC.
+// Copyright (c) 2023-2026, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -111,12 +111,19 @@ int main(int argc, char *argv[])
         rescan->abort = false;
         rescan->loadConfig();
         rescan->reloadDatabase();
+        rescan->importLogData();
+        output << "Done." << Qt::endl;
     }
     else
     {
         if(emerged)
         {
             portage->emergedApp(appList);
+            if(rescan == nullptr)
+            {
+                rescan = new ImportVDB();
+            }
+            rescan->updateLogData();
         }
 
         if(reload)
@@ -125,9 +132,11 @@ int main(int argc, char *argv[])
             {
                 rescan = new ImportVDB();
             }
+
             rescan->abort = false;
             rescan->loadConfig();
             rescan->reloadApp(appList);
+            rescan->updateLogData();
         }
     }
 

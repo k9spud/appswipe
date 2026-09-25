@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2026, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,6 +20,7 @@
 #include "k9atomlist.h"
 
 #include <QStringList>
+#include <QTextStream>
 
 class QSqlQuery;
 class ImportVDB
@@ -39,6 +40,9 @@ public:
     int readConfigFile(QString fileFolder, QString fileName, K9AtomAction::AtomActionType actionType);
     void applyConfigMasks(K9Atom::maskType& masked, QString category, QString package, QString slot, QString subslot, QStringList keywordList);
 
+    void importLogData();
+    void updateLogData();
+    int importRemainingLogData(QTextStream& logStream, QSqlQuery& query);
     void reloadDatabase(void);
     void reloadApp(QStringList appsList);
 

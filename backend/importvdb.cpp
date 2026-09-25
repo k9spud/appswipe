@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2025, K9spud LLC.
+// Copyright (c) 2021-2026, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -270,7 +270,6 @@ values
     }
     db.commit();
     progress(100);
-    output << "Done." << Qt::endl;
 }
 
 void ImportVDB::reloadApp(QStringList appsList)
@@ -912,6 +911,232 @@ void ImportVDB::applyConfigMasks(K9Atom::maskType& masked, QString category, QSt
             }
         }
     }
+}
+
+void ImportVDB::importLogData()
+{
+    QSqlDatabase db;
+    if(QSqlDatabase::contains("RescanThread") == false)
+    {
+        db = QSqlDatabase::addDatabase("QSQLITE", "RescanThread");
+    }
+    else
+    {
+        db = QSqlDatabase::database("RescanThread");
+        if(db.isValid())
+        {
+            db.close();
+        }
+    }
+
+    db.setDatabaseName(ds->storageFolder + ds->databaseFileName);
+    db.open();
+
+    QSqlQuery query(db);
+
+    if(!db.transaction())
+    {
+        QTextStream(stderr) << "Error: Failed to start transaction for LOGDATA import.\n";
+        return;
+    }
+
+    query.prepare("delete from LOGDATA");
+    if(!query.exec())
+    {
+        QTextStream(stderr) << "Error: Failed to clear LOGDATA table: " << query.lastError().text() << "\n";
+        db.rollback();
+        return;
+    }
+
+    QFile logFile(QStringLiteral("/var/log/emerge.log"));
+    if (logFile.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        output << "Loading /var/log/emerge.log" << Qt::endl;
+        QTextStream logStream(&logFile);
+        if(importRemainingLogData(logStream, query) != 0)
+        {
+            db.rollback();
+            logFile.close();
+            return;
+        }
+
+        logFile.close();
+    }
+
+    if(!db.commit())
+    {
+        QTextStream(stderr) << "Error: Failed to commit transaction for LOGDATA import.\n";
+        db.rollback();
+    }
+}
+
+void ImportVDB::updateLogData()
+{
+    QSqlDatabase db;
+    if(QSqlDatabase::contains("RescanThread") == false)
+    {
+        db = QSqlDatabase::addDatabase("QSQLITE", "RescanThread");
+    }
+    else
+    {
+        db = QSqlDatabase::database("RescanThread");
+        if(db.isValid())
+        {
+            db.close();
+        }
+    }
+
+    db.setDatabaseName(ds->storageFolder + ds->databaseFileName);
+    db.open();
+
+    QSqlQuery query(db);
+    if(!query.exec(QStringLiteral("select LOGTIMESTAMP, LOGOFFSET from META")) || !query.first())
+    {
+        QTextStream(stderr) << "Error: Couldn't read log info from META: " << query.lastError().text() << "\n";
+        return;
+    }
+
+    bool ok;
+    qint64 targetTimestamp = query.value(0).toLongLong(&ok);
+    if(ok == false)
+    {
+        QTextStream(stderr) << "Error: Invalid log timestamp from META:\n" << query.value(0).toString();
+        return;
+    }
+    qint64 logOffset = query.value(1).toLongLong(&ok);
+    if(ok == false)
+    {
+        QTextStream(stderr) << "Error: Invalid log offset from META\n" << query.value(1).toString();
+        return;
+    }
+
+    if(!db.transaction())
+    {
+        QTextStream(stderr) << "Error: Failed to start transaction for LOGDATA import.\n";
+        return;
+    }
+
+    QFile logFile(QStringLiteral("/var/log/emerge.log"));
+    if (logFile.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        QTextStream textStream(&logFile);
+        if(textStream.seek(logOffset) == false)
+        {
+            QTextStream(stderr) << QString("Warning: Couldn't seek to META.LOGOFFSET (%1)\n").arg(logOffset);
+        }
+
+        QTextStream logStream(&logFile);
+        if(importRemainingLogData(logStream, query) != 0)
+        {
+            db.rollback();
+            logFile.close();
+            return;
+        }
+
+        logFile.close();
+    }
+
+    if(!db.commit())
+    {
+        QTextStream(stderr) << "Error: Failed to commit transaction for LOGDATA import.\n";
+        db.rollback();
+    }
+}
+
+int ImportVDB::importRemainingLogData(QTextStream& logStream, QSqlQuery& query)
+{
+    if(logStream.atEnd())
+    {
+        return 0;
+    }
+
+    QString logLine;
+    qint64 compilingTimestamp = 0;
+    QHash<QString, qint64> activeBuilds; // Track parallel builds by atom
+    qint64 lastLogTime = 0;
+    int colonIndex = 0;
+    QString currentFullAtom;
+    int emergeIdx;
+    int spaceIdx;
+    int secondSpace;
+    int toIdx;
+
+    query.prepare("insert into LOGDATA (ATOM, BUILDTIME) values (?, ?)");
+    while (!logStream.atEnd())
+    {
+        logLine = logStream.readLine();
+        colonIndex = logLine.indexOf(QLatin1Char(':'));
+        if (colonIndex != -1)
+        {
+            if (logLine.contains(QStringLiteral("Compiling/Merging")))
+            {
+                compilingTimestamp = logLine.left(colonIndex).toLongLong();
+                int openParen = logLine.indexOf(QStringLiteral("Compiling/Merging ("), colonIndex) + 18;
+                int doubleColon = logLine.indexOf(QStringLiteral(":"), openParen);
+                if (openParen != -1 && doubleColon != -1)
+                {
+                    QString atom = logLine.mid(openParen + 1, doubleColon - (openParen + 1)).trimmed();
+                    activeBuilds.insert(atom, compilingTimestamp);
+                }
+            }
+            else
+            {
+                emergeIdx = logLine.indexOf(QStringLiteral("completed emerge"));
+                if (emergeIdx != -1)
+                {
+                    lastLogTime = logLine.left(colonIndex).toLongLong();
+
+                    currentFullAtom.clear();
+                    spaceIdx = logLine.indexOf(QLatin1Char(' '), emergeIdx + 16);
+                    if (spaceIdx != -1)
+                    {
+                        secondSpace = logLine.indexOf(QLatin1Char(' '), spaceIdx + 1);
+                        if (secondSpace != -1)
+                        {
+                            spaceIdx = logLine.indexOf(") ", secondSpace + 1);
+                        }
+                    }
+
+                    if (spaceIdx != -1)
+                    {
+                        toIdx = logLine.indexOf(QStringLiteral(" to "), spaceIdx + 1);
+                        if (toIdx != -1)
+                        {
+                            currentFullAtom = logLine.mid(spaceIdx + 1, toIdx - (spaceIdx + 1)).trimmed();
+                        }
+                    }
+
+                    if (!currentFullAtom.isEmpty() && activeBuilds.contains(currentFullAtom))
+                    {
+                        qint64 compilingTimestamp = activeBuilds.take(currentFullAtom);
+                        qint64 compileTime = lastLogTime - compilingTimestamp;
+
+                        if (compileTime > 0)
+                        {
+                            query.addBindValue(currentFullAtom);
+                            query.addBindValue(compileTime);
+                            if (!query.exec())
+                            {
+                                QTextStream(stderr) << "Error: Failed to insert log data: " << query.lastError().text() << "\n";
+                                return -1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    query.prepare("update META set LOGTIMESTAMP=?, LOGOFFSET=?");
+    query.addBindValue(lastLogTime);
+    query.addBindValue(logStream.pos());
+    if(!query.exec())
+    {
+        QTextStream(stderr) << "Error: Failed to update META log stats. " << query.lastError().text() << "\n";
+        return -2;
+    }
+
+    return 0;
 }
 
 bool ImportVDB::importInstalledPackage(QSqlQuery* query, QString category, QString package)
