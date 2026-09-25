@@ -1,4 +1,4 @@
--- Copyright (c) 2021-2023, K9spud LLC.
+-- Copyright (c) 2021-2026, K9spud LLC.
 --
 -- This program is free software; you can redistribute it and/or
 -- modify it under the terms of the GNU General Public License
@@ -16,9 +16,11 @@
 
 create table if not exists META (
     SCHEMAVERSION integer,
-    UUID text
+    UUID text,
+    LOGTIMESTAMP integer not null default 0,
+    LOGOFFSET integer not null default 0
 );
-insert into META(SCHEMAVERSION) SELECT 5 WHERE NOT EXISTS(SELECT 0 FROM META);
+insert into META(SCHEMAVERSION) SELECT 6 WHERE NOT EXISTS(SELECT 0 FROM META);
 
 create table if not exists WINDOW (
     WINDOWID integer primary key,
@@ -84,6 +86,12 @@ create table if not exists PACKAGE (
     PUBLISHED integer,
     STATUS integer,
     SUBSLOT text
+);
+
+create table if not exists LOGDATA (
+    LOGDATAID integer primary key autoincrement,
+    ATOM text,
+    BUILDTIME integer
 );
 
 -- PACKAGE.STATUS: 0 = unknown, 1 = testing, 2 = stable
