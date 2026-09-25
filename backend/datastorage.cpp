@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, K9spud LLC.
+// Copyright (c) 2021-2026, K9spud LLC.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -182,7 +182,7 @@ QString DataStorage::openDatabase()
             schemaVersion = query.value(0).toInt();
         }
 
-        if(schemaVersion < 5)
+        if(schemaVersion < 6)
         {
             upgradeDatabase(query, db, schemaVersion);
         }
@@ -217,6 +217,23 @@ bool DataStorage::upgradeDatabase(QSqlQuery& query, QSqlDatabase& db, int schema
     }
 
     db.transaction();
+
+    if(schemaVersion < 6)
+    {
+        if(query.exec("alter table META add column LOGTIMESTAMP integer not null default 0") == false)
+        {
+            qDebug() << "Couldn't add column META.LOGTIMESTAMP upgrading from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+
+        if(query.exec("alter table META add LOGOFFSET integer not null default 0") == false)
+        {
+            qDebug() << "Couldn't add column META.LOGOFFSET upgrading from schemaVersion:" << schemaVersion;
+            db.rollback();
+            return false;
+        }
+    }
 
     if(schemaVersion < 5)
     {
@@ -297,7 +314,7 @@ bool DataStorage::upgradeDatabase(QSqlQuery& query, QSqlDatabase& db, int schema
         return false;
     }
 
-    int finalVersion = 5;
+    int finalVersion = 6;
     query.prepare("update META set UUID=ifnull(UUID,?), SCHEMAVERSION=?");
     query.bindValue(0, QUuid::createUuid().toString(QUuid::WithoutBraces));
     query.bindValue(1, finalVersion);
