@@ -803,7 +803,6 @@ void ImportVDB::applyConfigMasks(K9Atom::maskType& masked, QString category, QSt
     QList<int> matchingAtomIds = atomList.findMatches(category, package, slot, subslot, portage->version);
     const int matchingIdsCount = matchingAtomIds.count();
     int atomId;
-    QStringList sl;
     int i;
 
     for(i = 0; i < matchingIdsCount; i++)
@@ -990,19 +989,13 @@ void ImportVDB::updateLogData()
     db.open();
 
     QSqlQuery query(db);
-    if(!query.exec(QStringLiteral("select LOGTIMESTAMP, LOGOFFSET from META")) || !query.first())
+    if(!query.exec(QStringLiteral("select LOGOFFSET from META")) || !query.first())
     {
         QTextStream(stderr) << "Error: Couldn't read log info from META: " << query.lastError().text() << "\n";
         return;
     }
 
     bool ok;
-    qint64 targetTimestamp = query.value(0).toLongLong(&ok);
-    if(ok == false)
-    {
-        QTextStream(stderr) << "Error: Invalid log timestamp from META:\n" << query.value(0).toString();
-        return;
-    }
     qint64 logOffset = query.value(1).toLongLong(&ok);
     if(ok == false)
     {
