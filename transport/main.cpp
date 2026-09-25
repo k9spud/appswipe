@@ -219,6 +219,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
     QString category = x.first();
     QString package = appNoVersion(x.last());
     QString version = appVersion(x.last());
+    QString atomv = QString("%1/%2-%3").arg(category, package, version);
     int packageId = 0;
     query.bindValue(0, category);
     query.bindValue(1, package);
@@ -589,6 +590,7 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
             if(rowId == packageId)
             {
                 output << QString("<TD %1><B>&raquo;&nbsp;&nbsp;</B></TD>").arg(rowClass);
+                atomv = QString("%1/%2-%3").arg(category, package, version);
             }
             else
             {
@@ -739,7 +741,39 @@ order by p.PACKAGE, p.V1 desc, p.V2 desc, p.V3 desc, p.V4 desc, p.V5 desc, p.V6 
         {
             QDateTime lastBuiltDT;
             lastBuiltDT.setSecsSinceEpoch(lastBuilt.toInt());
-            output << "<P><B>Last built:</B> " << Qt::flush << QString("%1</P>").arg(lastBuiltDT.toString("dddd MMMM d, yyyy h:mm AP"));
+
+            QString buildTimeString;
+            QSqlQuery qryLog(db);
+            qryLog.prepare(QStringLiteral("select BUILDTIME from LOGDATA where ATOM=?"));
+            qryLog.addBindValue(atomv);
+            if (qryLog.exec() && qryLog.next())
+            {
+                qint64 totalSeconds = qryLog.value(0).toLongLong();
+                qint64 hours = totalSeconds / 3600;
+                qint64 minutes = (totalSeconds % 3600) / 60;
+                qint64 seconds = totalSeconds % 60;
+
+                QStringList parts;
+                if (hours > 0)
+                {
+                    parts << QString("%1 hour%2").arg(hours).arg(hours == 1 ? "" : "s");
+                }
+
+                if (minutes > 0 || hours > 0)
+                {
+                    parts << QString("%1 minute%2").arg(minutes).arg(minutes == 1 ? "" : "s");
+                }
+
+                if (seconds > 0)
+                {
+                    parts << QString("%1 second%2").arg(seconds).arg(seconds == 1 ? "" : "s");
+                }
+
+                buildTimeString = QString(" (%1)").arg(parts.join(", "));
+            }
+
+            output << "<P><B>Last built:</B> " << Qt::flush
+                   << QString("%1%2</P>").arg(lastBuiltDT.toString("ddd MMM d, yyyy h:mm AP"), buildTimeString);
         }
 
         if(cFlags.isEmpty() == false)
