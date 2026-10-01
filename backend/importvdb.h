@@ -20,7 +20,7 @@
 #include "k9atomlist.h"
 
 #include <QStringList>
-#include <QTextStream>
+#include <QFile>
 
 class QSqlQuery;
 class ImportVDB
@@ -41,8 +41,8 @@ public:
     void applyConfigMasks(K9Atom::maskType& masked, QString category, QString package, QString slot, QString subslot, QStringList keywordList);
 
     void importLogData();
-    void updateLogData();
-    int importRemainingLogData(QTextStream& logStream, QSqlQuery& query);
+    void updateLogData(QStringList& appsList);
+    int importRemainingLogData(QFile& logFile, QSqlQuery& query, QStringList* appsList = nullptr);
     void reloadDatabase(void);
     void reloadApp(QStringList appsList);
 
