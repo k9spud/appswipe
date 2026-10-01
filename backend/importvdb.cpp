@@ -23,7 +23,6 @@
 
 #include <QDebug>
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QDateTime>
 #include <QSqlQuery>
@@ -951,8 +950,7 @@ void ImportVDB::importLogData()
     if (logFile.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         output << "Loading /var/log/emerge.log" << Qt::endl;
-        QTextStream logStream(&logFile);
-        if(importRemainingLogData(logStream, query) != 0)
+        if(importRemainingLogData(logFile, query) != 0)
         {
             db.rollback();
             logFile.close();
@@ -969,7 +967,7 @@ void ImportVDB::importLogData()
     }
 }
 
-void ImportVDB::updateLogData()
+void ImportVDB::updateLogData(QStringList& appsList)
 {
     QSqlDatabase db;
     if(QSqlDatabase::contains("RescanThread") == false)
@@ -996,7 +994,7 @@ void ImportVDB::updateLogData()
     }
 
     bool ok;
-    qint64 logOffset = query.value(1).toLongLong(&ok);
+    qint64 logOffset = query.value(0).toLongLong(&ok);
     if(ok == false)
     {
         QTextStream(stderr) << "Error: Invalid log offset from META\n" << query.value(1).toString();
@@ -1012,14 +1010,12 @@ void ImportVDB::updateLogData()
     QFile logFile(QStringLiteral("/var/log/emerge.log"));
     if (logFile.open(QIODevice::ReadOnly | QIODevice::Text))
     {
-        QTextStream textStream(&logFile);
-        if(textStream.seek(logOffset) == false)
+        if(logFile.seek(logOffset) == false)
         {
             QTextStream(stderr) << QString("Warning: Couldn't seek to META.LOGOFFSET (%1)\n").arg(logOffset);
         }
 
-        QTextStream logStream(&logFile);
-        if(importRemainingLogData(logStream, query) != 0)
+        if(importRemainingLogData(logFile, query, &appsList) != 0)
         {
             db.rollback();
             logFile.close();
@@ -1036,9 +1032,23 @@ void ImportVDB::updateLogData()
     }
 }
 
-int ImportVDB::importRemainingLogData(QTextStream& logStream, QSqlQuery& query)
+QString stripAtomVersion(const QString &atomWithVersion)
 {
-    if(logStream.atEnd())
+    // Scan backward to find the '-' followed by a digit
+    // We start at size() - 2 because a hyphen at the very end wouldn't prefix a version
+    for (int i = atomWithVersion.size() - 2; i >= 0; --i)
+    {
+        if (atomWithVersion.at(i) == '-' && atomWithVersion.at(i + 1).isDigit())
+        {
+            return atomWithVersion.left(i);
+        }
+    }
+    return atomWithVersion; // Return unchanged if no version pattern is matched
+}
+
+int ImportVDB::importRemainingLogData(QFile& logFile, QSqlQuery& query, QStringList* appsList)
+{
+    if(logFile.atEnd())
     {
         return 0;
     }
@@ -1053,11 +1063,17 @@ int ImportVDB::importRemainingLogData(QTextStream& logStream, QSqlQuery& query)
     int spaceIdx;
     int secondSpace;
     int toIdx;
+    QString atomNoVersion;
+    QByteArray logLineBytes;
+    qint64 newLogOffset;
+    qint64 oldLogOffset;
+    oldLogOffset = newLogOffset = logFile.pos();
 
     query.prepare("insert into LOGDATA (ATOM, BUILDTIME) values (?, ?)");
-    while (!logStream.atEnd())
+    while (!(logLineBytes = logFile.readLine(4096)).isEmpty())
     {
-        logLine = logStream.readLine();
+        logLine = QString::fromUtf8(logLineBytes);
+
         colonIndex = logLine.indexOf(QLatin1Char(':'));
         if (colonIndex != -1)
         {
@@ -1070,6 +1086,16 @@ int ImportVDB::importRemainingLogData(QTextStream& logStream, QSqlQuery& query)
                 {
                     QString atom = logLine.mid(openParen + 1, doubleColon - (openParen + 1)).trimmed();
                     activeBuilds.insert(atom, compilingTimestamp);
+
+                    if(appsList != nullptr)
+                    {
+                        atomNoVersion = stripAtomVersion(atom);
+
+                        if(appsList->contains(atomNoVersion) == false)
+                        {
+                            appsList->append(atomNoVersion);
+                        }
+                    }
                 }
             }
             else
@@ -1077,8 +1103,6 @@ int ImportVDB::importRemainingLogData(QTextStream& logStream, QSqlQuery& query)
                 emergeIdx = logLine.indexOf(QStringLiteral("completed emerge"));
                 if (emergeIdx != -1)
                 {
-                    lastLogTime = logLine.left(colonIndex).toLongLong();
-
                     currentFullAtom.clear();
                     spaceIdx = logLine.indexOf(QLatin1Char(' '), emergeIdx + 16);
                     if (spaceIdx != -1)
@@ -1101,9 +1125,11 @@ int ImportVDB::importRemainingLogData(QTextStream& logStream, QSqlQuery& query)
 
                     if (!currentFullAtom.isEmpty() && activeBuilds.contains(currentFullAtom))
                     {
+                        newLogOffset = logFile.pos();
+                        lastLogTime = logLine.left(colonIndex).toLongLong();
+
                         qint64 compilingTimestamp = activeBuilds.take(currentFullAtom);
                         qint64 compileTime = lastLogTime - compilingTimestamp;
-
                         if (compileTime > 0)
                         {
                             query.addBindValue(currentFullAtom);
@@ -1120,13 +1146,16 @@ int ImportVDB::importRemainingLogData(QTextStream& logStream, QSqlQuery& query)
         }
     }
 
-    query.prepare("update META set LOGTIMESTAMP=?, LOGOFFSET=?");
-    query.addBindValue(lastLogTime);
-    query.addBindValue(logStream.pos());
-    if(!query.exec())
+    if(newLogOffset != oldLogOffset)
     {
-        QTextStream(stderr) << "Error: Failed to update META log stats. " << query.lastError().text() << "\n";
-        return -2;
+        query.prepare("update META set LOGTIMESTAMP=?, LOGOFFSET=?");
+        query.addBindValue(lastLogTime);
+        query.addBindValue(newLogOffset);
+        if(!query.exec())
+        {
+            QTextStream(stderr) << "Error: Failed to update META log stats. " << query.lastError().text() << "\n";
+            return -2;
+        }
     }
 
     return 0;
