@@ -59,10 +59,10 @@ int main(int argc, char *argv[])
     {
         if(qstrcmp(argv[i], "-emerged") == 0)
         {
+            emerged = true;
             while(++i < argc)
             {
                 appList << argv[i];
-                emerged = true;
             }
             break;
         }
@@ -116,27 +116,23 @@ int main(int argc, char *argv[])
     }
     else
     {
-        if(emerged)
+        if(rescan == nullptr)
         {
+            rescan = new ImportVDB();
+        }
+        rescan->updateLogData(appList);
+
+        if(emerged && appList.count() > 0)
+        {
+            //qDebug() << appList;
             portage->emergedApp(appList);
-            if(rescan == nullptr)
-            {
-                rescan = new ImportVDB();
-            }
-            rescan->updateLogData();
         }
 
         if(reload)
         {
-            if(rescan == nullptr)
-            {
-                rescan = new ImportVDB();
-            }
-
             rescan->abort = false;
             rescan->loadConfig();
             rescan->reloadApp(appList);
-            rescan->updateLogData();
         }
     }
 
