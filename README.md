@@ -1,7 +1,7 @@
 
 App Swipe
 =========
-Copyright (c) 2021-2025, K9spud LLC
+Copyright (c) 2021-2026, K9spud LLC
 
 This is an application for browsing your local Portage repository files.
 Easily manage your system's applications from a point and click user interface
@@ -10,12 +10,12 @@ upgrading apps.
 
 ![Screenshot](https://github.com/k9spud/appswipe/assets/39664841/754e807d-4e57-457e-8d54-554d38e8a070)
 
-What's New in v1.2.0?
+What's New in v1.2.2?
 =====================
 
-Now compiles under Qt 6! Still compiles under Qt 5 too, if you want that.
-
-Improved the dependencies display to match more closely with Portage.
+Makes use of /var/log/emerge.log to calculate build times and keep
+the internal SQLite database up-to-date for packages that get pulled
+into an emerge by way of dependencies.
 
 Help Get the Word Out
 =====================
@@ -116,13 +116,13 @@ at `/var/db/repos`. This data is inserted into a
 
 From that point on, you can do searches and browse your portage repos
 at blazing speed, thanks to the underlying SQLite database. As you install, 
-upgrade, etc, App Swipe attempts to keep the SQLite database up-to-date, 
-but this is currently not always perfect. If an emerge operation pulls in 
-additional dependencies, for example, App Swipe currently has no way of 
-knowing about these extra changes, so you may have to manually trigger 
-a `Reload Database` operation from time to time, to bring App Swipe's 
-internal database back up to matching what's really in your system at 
-the moment.
+upgrade, etc, App Swipe attempts to keep the SQLite database up-to-date.
+
+As of v1.2.2, if an emerge operation pulls in additional dependencies, 
+App Swipe will find out by scanning /var/log/emerge.log. If for whatever 
+reason things get out of sync though, you may have to manually trigger a 
+`Reload Database` operation from time to time, to bring App Swipe's internal 
+database back up to matching what's really in your system at the moment.
 
 Using the `View Updates` page
 -----------------------------
